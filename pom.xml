@@ -34,6 +34,7 @@
         <module>work4j-data</module>
         <module>work4j-data-mongo</module>
         <module>work4j-controller</module>
+        <module>work4j-worker</module>
     </modules>
 	
     <properties>

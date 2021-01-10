@@ -38,6 +38,11 @@ public class JobIteration {
     private String message;
     
     /**
+     * The iteration payload
+     */
+    private Object payload;
+    
+    /**
      * The run time of iteration
      */
     private Long runtime;

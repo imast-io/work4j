@@ -11,7 +11,7 @@ import io.imast.work4j.model.exchange.*;
  * 
  * @author davitp
  */
-public interface PollingChannel {
+public interface SchedulerChannel {
     
     /**
      * Pull job groups for the given cluster
