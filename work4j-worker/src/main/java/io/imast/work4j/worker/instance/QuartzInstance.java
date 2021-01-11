@@ -10,6 +10,7 @@ import io.imast.work4j.worker.WorkerFactory;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import lombok.Getter;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
@@ -25,8 +26,15 @@ import org.quartz.impl.matchers.GroupMatcher;
 public class QuartzInstance {
     
     /**
+     * The worker name
+     */
+    @Getter
+    private final String worker;
+    
+    /**
      * The cluster name
      */
+    @Getter
     private final String cluster;
     
     /**
@@ -42,11 +50,13 @@ public class QuartzInstance {
     /**
      * Creates new quartz worker instance
      * 
+     * @param worker The worker name
      * @param cluster The cluster name
      * @param scheduler The scheduler instance
      * @param factory The controller factory
      */
-    public QuartzInstance(String cluster, Scheduler scheduler, WorkerFactory factory){
+    public QuartzInstance(String worker, String cluster, Scheduler scheduler, WorkerFactory factory){
+        this.worker = worker;
         this.cluster = cluster;
         this.scheduler = scheduler;
         this.factory = factory;
@@ -66,11 +76,29 @@ public class QuartzInstance {
     }
     
     /**
+     * Stops the scheduler
+     * 
+     * @throws WorkerException 
+     */
+    public void stop() throws WorkerException{
+        try {
+            this.scheduler.shutdown();
+        } catch (SchedulerException ex) {
+            throw new WorkerException("Could not stop quartz worker", ex);
+        }
+    }
+    
+    /**
      * Schedules the job definition
      * 
      * @param jobDefinition The job definition to schedule
      */
     public void schedule(JobDefinition jobDefinition){
+        
+        if(jobDefinition == null){
+            return;
+        }
+        
         synchronized(this.scheduler){
             this.scheduleImpl(jobDefinition);
         }
@@ -82,6 +110,11 @@ public class QuartzInstance {
      * @param jobDefinition The job definition to schedule
      */
     public void reschedule(JobDefinition jobDefinition){
+        
+        if(jobDefinition == null){
+            return;
+        }
+        
         synchronized(this.scheduler){
             this.rescheduleImpl(jobDefinition);
         }
@@ -94,6 +127,12 @@ public class QuartzInstance {
      * @param group The group of job
      */
     public void unschedule(String code, String group){
+        
+        // nothing to do
+        if(Str.blank(code) || Str.blank(group)){
+            return;
+        }
+        
         synchronized(this.scheduler){
             this.unscheduleImpl(code, group);
         }

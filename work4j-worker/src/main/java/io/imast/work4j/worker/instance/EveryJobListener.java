@@ -4,7 +4,7 @@ import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.JobIteration;
-import io.imast.work4j.worker.JobOps;
+import io.imast.work4j.worker.job.JobOps;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
