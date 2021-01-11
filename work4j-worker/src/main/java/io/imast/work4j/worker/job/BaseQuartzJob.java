@@ -2,7 +2,6 @@ package io.imast.work4j.worker.job;
 
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.worker.JobConstants;
-import io.imast.work4j.worker.JobOps;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;

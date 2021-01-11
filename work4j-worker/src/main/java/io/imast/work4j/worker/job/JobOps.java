@@ -1,8 +1,9 @@
-package io.imast.work4j.worker;
+package io.imast.work4j.worker.job;
 
 import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.work4j.model.JobDefinition;
+import io.imast.work4j.worker.JobConstants;
 import io.vavr.control.Try;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;

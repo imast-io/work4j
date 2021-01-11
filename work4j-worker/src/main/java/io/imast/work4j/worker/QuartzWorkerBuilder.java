@@ -29,7 +29,7 @@ public class QuartzWorkerBuilder {
     /**
      * The instance to configuration
      */
-    private final QuartzWorkerConfiguration config;
+    private final WorkerConfiguration config;
     
     /**
      * The worker factory instance
@@ -76,7 +76,7 @@ public class QuartzWorkerBuilder {
      * 
      * @param config The configuration instance
      */
-    private QuartzWorkerBuilder(QuartzWorkerConfiguration config){
+    private QuartzWorkerBuilder(WorkerConfiguration config){
         this.config = config;
         this.schedulerListeners = new ArrayList<>();
         this.jobListeners = new ArrayList<>();
@@ -93,7 +93,7 @@ public class QuartzWorkerBuilder {
      * @param config The configuration instance
      * @return Returns an instance to builder for chaining
      */
-    public static QuartzWorkerBuilder builder(QuartzWorkerConfiguration config){
+    public static QuartzWorkerBuilder builder(WorkerConfiguration config){
         return new QuartzWorkerBuilder(config);
     }
     
@@ -288,7 +288,7 @@ public class QuartzWorkerBuilder {
         catch(SchedulerException ex){
             throw new WorkerException("Could not register custom listeners to quartz scheduler", ex);
         }
-        
+                
         return scheduler;
     }
 }

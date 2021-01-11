@@ -4,7 +4,6 @@ import java.time.Duration;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
@@ -14,7 +13,9 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @Builder
-public class QuartzWorkerConfiguration {
+@AllArgsConstructor
+@NoArgsConstructor
+public class WorkerConfiguration {
     
     /**
      * Should supervise job management
@@ -45,6 +46,11 @@ public class QuartzWorkerConfiguration {
      * The frequency of agent updates
      */
     private Duration workerSignalRate;
+    
+    /**
+     * The maximum number of trying to register an agent 
+     */
+    private Integer agentRegistrationTries;
     
     /**
      * The type of clustering

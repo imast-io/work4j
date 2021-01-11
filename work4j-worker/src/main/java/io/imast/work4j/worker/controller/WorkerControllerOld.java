@@ -1,9 +1,11 @@
-package io.imast.work4j.worker;
+package io.imast.work4j.worker.controller;
 
 import io.imast.core.Coll;
 import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.core.Zdt;
+import io.imast.work4j.worker.JobConstants;
+import io.imast.work4j.worker.WorkerException;
 import io.vavr.control.Try;
 import java.time.Duration;
 import java.util.HashSet;
@@ -25,7 +27,7 @@ import java.util.UUID;
  * @author davitp
  */
 @Slf4j
-public class WorkerController {
+public class WorkerControllerOld {
         
     /**
      * The job manager configuration
@@ -79,11 +81,10 @@ public class WorkerController {
      * @param jobFactory The job factory
      * @param workerChannel The worker channel
      */
-    public WorkerController(WorkerControllerConfig config, JobFactory jobFactory, WorkerChannel workerChannel){
+    public WorkerControllerOld(WorkerControllerConfig config, JobFactory jobFactory, WorkerChannel workerChannel){
         this.config = config;
         this.jobFactory = jobFactory;
         this.workerChannel = workerChannel;
-        this.schedulerExecutor =  Executors.newScheduledThreadPool(1);
         this.cluster = Str.blank(this.config.getCluster()) ? JobConstants.DEFAULT_CLUSTER : this.config.getCluster();
         this.worker = Str.blank(this.config.getWorker()) ? UUID.randomUUID().toString() : this.config.getWorker();
     }
@@ -147,46 +148,7 @@ public class WorkerController {
         }
     }
     
-    /**
-     * Sync from controller
-     */
-    protected void syncImpl(){
-        
-        // get metadata for cluster
-        var metadata = this.workerChannel.metadata(new JobMetadataRequest(this.cluster)).orElse(null);
-        
-        // check if no groups
-        if(metadata == null){
-            throw new RuntimeException("WorkerController: Could not pull metadata from controller.");
-        }
-
-        // get groups
-        var groups = new HashSet<>(Lang.or(metadata.getGroups(), Str.EMPTY_LIST));
-        
-        // get running groups
-        var runningGroups = Try.of(() -> this.scheduler.getJobGroupNames()).getOrElse(Str.EMPTY_LIST);
-        
-        // unschedule all jobs in groups if the groups is not in controller
-        runningGroups.forEach(running -> {
-            
-            // leave group as it is running both in controller and in worker
-            if(groups.contains(running)){
-                return;
-            }
-            
-            // get jobs in group
-            var jobKeys = Try.of(() -> this.scheduler.getJobKeys(GroupMatcher.jobGroupEquals(running))).getOrElse(Set.of());
-            
-            // unschedule
-            jobKeys.forEach(job -> this.unschedule(job.getName(), job.getGroup()));
-        });
-        
-        // types of jobs
-        var types = this.jobFactory.getJobClasses().keySet();
-        
-        // for every (group, type) pair do sync process
-        Coll.doubleForeach(groups, types, this::syncGroupImpl);
-    }
+    
 
     /**
      * Sync with controller for group and type pair
@@ -217,85 +179,5 @@ public class WorkerController {
 
         // reschedule updated jobs
         statusUpdate.getUpdated().values().forEach(this::reschedule);
-    }
-    
-    /**
-     * Ensures that agent client has been registered
-     * 
-     * @param tryCount Number of tries
-     * @return Returns true if successful
-     */
-    private AgentDefinition ensureRegister(int tryCount){
-        
-        // try several times
-        for(int i = 0; i < tryCount; ++i){
-            
-            // register
-            var agent = this.register();
-            
-            // if successfuly registered
-            if(agent != null){
-                return agent;
-            }
-            
-            // delay for the next try
-            Lang.wait(5000);
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Register itself to the scheduler
-     */
-    private AgentDefinition register(){
-        
-        // the agent signal rate
-        Duration singalRate = this.config.getWorkerSignalRate();
-        
-        // now time
-        var now = Zdt.utc();
-        
-        // worker at cluster identity
-        var identity = String.format("%s@%s", this.worker, this.cluster);
-        
-        // the agent definition
-        var agent = AgentDefinition.builder()
-                .id(identity)
-                .worker(this.worker)
-                .cluster(this.cluster)
-                .name(identity)
-                .supervisor(this.config.isSupervise())
-                .health(new AgentHealth(now, AgentActivityType.REGISTER))
-                .expectedSignalMinutes(singalRate.toSeconds() / 60.0)
-                .registered(now)
-                .build();
-        
-        return this.workerChannel.registration(agent).orElse(null);
-    }
-
-    /**
-     * Report the health to scheduler
-     */
-    private void heartbeat() {
-                
-        // new health info
-        var health = new AgentHealth(Zdt.utc(), AgentActivityType.HEARTBEAT);
-        
-        this.workerChannel.heartbeat(this.agentDefinition.getId(), health);
-    }
-
-    /**
-     * Initialize the context modules
-     */
-    private void initializeContext() throws WorkerException {
-        
-        // check if scheduler is given
-        if(this.scheduler == null){
-            return;
-        }
-        
-        this.initContextModules();
-        this.initListeners();
     }
 }
