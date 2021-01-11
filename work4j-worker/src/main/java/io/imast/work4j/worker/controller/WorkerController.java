@@ -63,7 +63,7 @@ public class WorkerController {
         this.channel = channel;
         this.listener = listener;
         this.config = config;
-        this.asyncExecutor =  Executors.newScheduledThreadPool(1);
+        this.asyncExecutor = Executors.newScheduledThreadPool(1);
     }
     
     /**
