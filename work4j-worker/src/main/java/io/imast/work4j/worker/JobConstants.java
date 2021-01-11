@@ -30,7 +30,7 @@ public class JobConstants {
     /**
      * The job factory
      */
-    public static final String JOB_FACTORY = "JOB_FACTORY";
+    public static final String WORKER_FACTORY = "WORKER_FACTORY";
     
     /**
      * The unknown job type constant

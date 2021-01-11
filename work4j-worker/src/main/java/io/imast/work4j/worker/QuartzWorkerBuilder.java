@@ -4,12 +4,20 @@ import java.util.List;
 import java.util.Properties;
 import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.worker.instance.EveryJobListener;
+import io.imast.work4j.worker.instance.EveryTriggerListener;
+import io.imast.work4j.worker.instance.JobSchedulerListener;
+import io.vavr.control.Try;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.UUID;
 import org.quartz.JobListener;
 import org.quartz.SchedulerListener;
 import org.quartz.TriggerListener;
-import io.imast.work4j.worker.instance.*;
+import java.util.Map;
+import org.quartz.Scheduler;
+import org.quartz.SchedulerException;
+import org.quartz.impl.StdSchedulerFactory;
 
 /**
  * A special builder to create quartz worker
@@ -27,6 +35,11 @@ public class QuartzWorkerBuilder {
      * The worker factory instance
      */
     private final WorkerFactory factory;
+    
+     /**
+     * The job modules by type
+     */
+    protected final Map<String, Map<String, Object>> jobModules;
     
     /**
      * The set of scheduler listeners
@@ -71,6 +84,7 @@ public class QuartzWorkerBuilder {
         this.cluster = Str.blank(this.config.getCluster()) ? JobConstants.DEFAULT_CLUSTER : this.config.getCluster();
         this.worker = Str.blank(this.config.getWorker()) ? UUID.randomUUID().toString() : this.config.getWorker();
         this.factory = new WorkerFactory();
+        this.jobModules = new HashMap<>();
     }
     
     /**
@@ -89,7 +103,7 @@ public class QuartzWorkerBuilder {
      * @param channel The channel instance
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder channel(SchedulerChannel channel){
+    public QuartzWorkerBuilder withChannel(SchedulerChannel channel){
         this.schedulerChannel = channel;
         return this;
     }
@@ -115,7 +129,7 @@ public class QuartzWorkerBuilder {
      * @return Returns builder for chaining
      */
     public QuartzWorkerBuilder withModule(String type, String key, Object module){
-        this.factory.registerModule(type, key, module);
+        this.registerModule(type, key, module);
         return this;
     }
     
@@ -192,4 +206,89 @@ public class QuartzWorkerBuilder {
         return props;
     }
     
+    /**
+     * Register a module for the given job type with the given key
+     * 
+     * @param type The job type
+     * @param key The module key
+     * @param module The module instance
+     */
+    private void registerModule(String type, String key, Object module){
+        
+        // add type if missing
+        if(!this.jobModules.containsKey(type)){
+            this.jobModules.put(type, new HashMap<>());
+        }
+        
+        // register module
+        this.jobModules.get(type).put(key, module);
+    }
+    
+    /**
+     * Initialize an instance of quartz scheduler 
+     * 
+     * @return Returns ready-to-use quartz scheduler instance
+     * @throws WorkerException 
+     */
+    private Scheduler initScheduler() throws WorkerException{
+     
+        // properties for the quartz scheduler
+        var props = this.quartzProps();
+                
+        // assign scheduler factory
+        var schedulerFactory = Try.of(() -> new StdSchedulerFactory(props));
+        
+        // could not create scheduler factory
+        if(schedulerFactory.isFailure()){
+            throw new WorkerException("Could not create quartz scheduler factory", schedulerFactory.getCause());
+        }
+        
+        // try get scheduler from factory
+        var tryScheduler = Try.of(() -> schedulerFactory.get().getScheduler());
+        
+        // validity indicator
+        if(tryScheduler.isFailure()){
+            throw new WorkerException("Could not initialize quartz scheduler instance", tryScheduler.getCause());
+        }
+        
+        // the scheduler object
+        var scheduler = tryScheduler.get();
+        
+        // initialize context modules of scheduler
+        try {
+            scheduler.getContext().put(JobConstants.WORKER_FACTORY, this.factory);
+            scheduler.getContext().put(JobConstants.JOB_MODULES, this.jobModules);
+        }
+        catch(SchedulerException ex){
+            throw new WorkerException("Could not add context modules to scheduler", ex);
+        }
+        
+        // add work4j listeners
+        try{
+            scheduler.getListenerManager().addSchedulerListener(new JobSchedulerListener(this.schedulerChannel));
+            scheduler.getListenerManager().addJobListener(new EveryJobListener(this.schedulerChannel));
+            scheduler.getListenerManager().addTriggerListener(new EveryTriggerListener(this.schedulerChannel));
+        }
+        catch(SchedulerException ex){
+            throw new WorkerException("Could not register Work4j listeners to quartz scheduler", ex);
+        }
+        
+        // add custom scheduler
+        try{
+            for(var listener : this.schedulerListeners){
+                scheduler.getListenerManager().addSchedulerListener(listener);
+            }
+            for(var listener : this.jobListeners){
+                scheduler.getListenerManager().addJobListener(listener);
+            }
+            for(var listener : this.triggerListeners){
+                scheduler.getListenerManager().addTriggerListener(listener);
+            }
+        }
+        catch(SchedulerException ex){
+            throw new WorkerException("Could not register custom listeners to quartz scheduler", ex);
+        }
+        
+        return scheduler;
+    }
 }

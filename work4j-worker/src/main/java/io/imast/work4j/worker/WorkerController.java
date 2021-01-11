@@ -94,20 +94,7 @@ public class WorkerController {
      */
     public void initialize() throws WorkerException {
         
-        // properties for the quartz scheduler
-        var props = this.initProps();
-                
-        // assign scheduler factory
-        this.schedulerFactory = Try.of(() -> new StdSchedulerFactory(props)).getOrNull();
-        
-        // assign scheduler if valid
-        this.scheduler = Try.of(() -> this.schedulerFactory == null ? null : this.schedulerFactory.getScheduler()).getOrNull();
-        
-        // validity indicator
-        if(this.scheduler == null){
-            throw new WorkerException("Could not initialize worker controller");
-        }
-        
+       
         // initialize scheduler context
         this.initializeContext();        
     }
@@ -145,37 +132,6 @@ public class WorkerController {
             log.error("WorkerChannel: Could not start quartz scheduler: ", error);
         }        
     }
-    
-    /**
-     * Add scheduler context entity to be used on demand
-     * 
-     */
-    private void initContextModules() throws WorkerException{
-        try {
-            this.scheduler.getContext().put(JobConstants.JOB_FACTORY, this.jobFactory);
-            this.scheduler.getContext().put(JobConstants.JOB_MODULES, this.jobFactory.getJobModules());
-        } catch (SchedulerException error) {
-            log.error("WorkerController: Could not register job modules context: ", error);
-            throw new WorkerException("Could not initialize context modules", error);
-        }
-    }
-    
-    /**
-     * Add scheduler listeners (job, trigger)
-     */
-    private void initListeners() throws WorkerException{
-        try{
-            // register job listener
-            this.scheduler.getListenerManager().addJobListener(new EveryJobListener(this.workerChannel));
-            this.scheduler.getListenerManager().addSchedulerListener(new JobSchedulerListener(this.scheduler, this.workerChannel));
-        }
-        catch (SchedulerException error) {
-            log.error("WorkerController: Could not register job/trigger listener: ", error);
-            throw new WorkerException("Could not initialize listener modules", error);
-        }
-    }
-    
-    
     
     /**
      * Refresh jobs and sync with server
