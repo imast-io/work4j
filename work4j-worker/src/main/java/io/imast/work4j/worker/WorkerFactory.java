@@ -1,11 +1,16 @@
 package io.imast.work4j.worker;
 
+import io.imast.core.Str;
 import io.imast.core.Zdt;
 import io.imast.work4j.model.JobDefinition;
+import io.imast.work4j.model.TriggerDefinition;
+import io.vavr.control.Try;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.CronExpression;
@@ -26,12 +31,6 @@ import org.quartz.TriggerBuilder;
 public class WorkerFactory {
     
     /**
-     * The job modules by type
-     */
-    @Getter
-    protected final Map<String, Map<String, Object>> jobModules;
-    
-    /**
      * The map of job classes 
      */
     @Getter
@@ -41,26 +40,7 @@ public class WorkerFactory {
      * Creates new instance of job factory
      */
     public WorkerFactory(){
-        this.jobModules = new HashMap<>();
         this.jobClasses = new HashMap<>();
-    }
-    
-    /**
-     * Register a module for the given job type with the given key
-     * 
-     * @param type The job type
-     * @param key The module key
-     * @param module The module instance
-     */
-    public void registerModule(String type, String key, Object module){
-        
-        // add type if missing
-        if(!this.jobModules.containsKey(type)){
-            this.jobModules.put(type, new HashMap<>());
-        }
-        
-        // register module
-        this.jobModules.get(type).put(key, module);
     }
     
     /**
@@ -102,75 +82,108 @@ public class WorkerFactory {
         
         return job;
     }
-    
+
     /**
-     * Creates the set of Cron triggers for the given job
+     * Try get time zone from string
      * 
-     * @param jobDefinition The job definition
-     * @return Returns job triggers
+     * @param timezone The given time zone
+     * @return Return timezone or null
      */
-    public Set<Trigger> createCronTriggers(JobDefinition jobDefinition){
-        // job triggers
-        var triggers = new HashSet<Trigger>();
+    private TimeZone getTimezone(String timezone){
         
-        // unique expressions
-        var expressions = new HashSet<String>();
-            
-        // add all the cron triggers
-        for(var cronTrigger : jobDefinition.getCronTriggers()){
-
-            // cron expression
-            var cronExpression = cronTrigger.getExpression();
-
-            // check for uniqueness
-            if(expressions.contains(cronExpression)){
-                log.warn("WorkerFactory: Skipping expression because of duplication: "  + cronExpression);
-                continue;
-            }
-            
-            // check validity 
-            if(!CronExpression.isValidExpression(cronExpression)){
-                log.warn("WorkerFactory: Skipping cron trigger as it is not valid: " + cronExpression);
-                continue;
-            }
-
-            // create trigger
-            var triggerBuilder = TriggerBuilder.newTrigger()
-                .withIdentity(cronExpression, JobOps.identity(jobDefinition))
-                .withSchedule(CronScheduleBuilder.cronSchedule(cronExpression));
-            
-            // if end time is given
-            if(jobDefinition.getEndAt() != null){
-                triggerBuilder.endAt(Zdt.toDate(jobDefinition.getEndAt()));
-            }
-
-            // schedule job with cron trigger
-            triggers.add(triggerBuilder.build());
-        
-            // remember expression to avoid duplicates
-            expressions.add(cronExpression);
+        // check if timezone is given
+        if(Str.blank(timezone)){
+            return null;
         }
         
-        return triggers;
+        // try get zone id
+        var zoneid = Try.of(() -> ZoneId.of(timezone)).getOrNull();
+        
+        // no zone
+        if(zoneid == null){
+            return null;
+        }
+        
+        return TimeZone.getTimeZone(zoneid);
+    }
+    
+    /**
+     * The trigger definition
+     * 
+     * @param trigger The trigger definition
+     * @return Returns a unique key for trigger
+     */
+    private String triggerKey(TriggerDefinition trigger){
+        // return unique name for trigger
+        return Str.blank(trigger.getName()) ? Str.random(8) : trigger.getName();
     }
     
     /**
      * Creates the set of Cron triggers for the given job
      * 
      * @param jobDefinition The job definition
+     * @param trigger The trigger definition
      * @return Returns job triggers
      */
-    public HashSet<Trigger> createStaticPeriodTriggers(JobDefinition jobDefinition){
+    private Set<Trigger> cronTrigger(JobDefinition jobDefinition, TriggerDefinition trigger){
+
+        // result quartz triggers
+        var result = new HashSet<Trigger>();
+        
+        // cron expression
+        var cronExpression = trigger.getCron();
+        
+        // check validity 
+        if(Str.blank(cronExpression) || !CronExpression.isValidExpression(cronExpression)){
+            log.warn("WorkerFactory: Skipping cron trigger as it is not valid: " + cronExpression);
+            return result;
+        }
+        
+        // try get zone
+        var zone = this.getTimezone(trigger.getTimezone());
+        
+        // build cron schedule
+        var schedule = CronScheduleBuilder.cronSchedule(cronExpression).inTimeZone(zone);
+        
+        // create trigger
+        var triggerBuilder = TriggerBuilder.newTrigger()
+            .withIdentity(this.triggerKey(trigger), JobOps.identity(jobDefinition))
+            .withSchedule(schedule);
+
+        // if start time is given
+        if(trigger.getStartAt()!= null){
+            triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
+        }
+        
+        // if end time is given
+        if(trigger.getEndAt() != null){
+            triggerBuilder.endAt(Zdt.toDate(trigger.getEndAt()));
+        }
+
+        // schedule job with cron trigger
+        result.add(triggerBuilder.build());
+        
+        return result;
+    }
+    
+    /**
+     * Creates the set of Cron triggers for the given job
+     * 
+     * @param jobDefinition The job definition
+     * @param trigger The trigger definition
+     * @return Returns job triggers
+     */
+    private Set<Trigger> periodTrigger(JobDefinition jobDefinition, TriggerDefinition trigger){
         // job triggers
-        HashSet<Trigger> triggers = new HashSet<>();
+        var result = new HashSet<Trigger>();
      
         // period in milliseconds
-        var periodMs = jobDefinition.getPeriod();
+        var periodMs = trigger.getPeriod();
         
         // if not given
         if(periodMs == null || periodMs == 0.0){
             log.warn("WorkerFactory: Cannot create static period trigger because of missing period.");
-            return new HashSet<>();
+            return result;
         }
         
         // convert to seconds
@@ -178,40 +191,51 @@ public class WorkerFactory {
         
         // create trigger
         var triggerBuilder = TriggerBuilder.newTrigger()
-                .withIdentity("STATIC_PERIOD", JobOps.identity(jobDefinition))
+                .withIdentity(this.triggerKey(trigger), JobOps.identity(jobDefinition))
                 .withSchedule(SimpleScheduleBuilder.repeatSecondlyForever(periodSecond));
         
+        // if start time is given
+        if(trigger.getStartAt()!= null){
+            triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
+        }
+        
         // if end time is given
-        if(jobDefinition.getEndAt() != null){
-            triggerBuilder.endAt(Zdt.toDate(jobDefinition.getEndAt()));
+        if(trigger.getEndAt() != null){
+            triggerBuilder.endAt(Zdt.toDate(trigger.getEndAt()));
         }
         
         // add trigger
-        triggers.add(triggerBuilder.build());
+        result.add(triggerBuilder.build());
         
-        return triggers;
+        return result;
     }
     
     /**
      * Creates the set of Cron triggers for the given job
      * 
      * @param jobDefinition The job definition
+     * @param trigger The trigger definition
      * @return Returns job triggers
      */
-    public HashSet<Trigger> createOneTimeTriggers(JobDefinition jobDefinition){
+    public Set<Trigger> createOneTimeTriggers(JobDefinition jobDefinition, TriggerDefinition trigger){
         // job triggers
-        HashSet<Trigger> triggers = new HashSet<>();
+        var result = new HashSet<Trigger>();
       
         // create trigger
-        var trigger = TriggerBuilder.newTrigger()
-                .withIdentity("ONE_TIME_TRIGGER", JobOps.identity(jobDefinition))
-                .startNow()
-                .build();
+        var triggerBuilder = TriggerBuilder.newTrigger()
+                .withIdentity(this.triggerKey(trigger), JobOps.identity(jobDefinition));
+        
+         // if start time is given
+        if(trigger.getStartAt()!= null){
+            triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
+        } else {
+            triggerBuilder.startNow();
+        }
         
         // add trigger
-        triggers.add(trigger);
+        result.add(triggerBuilder.build());
         
-        return triggers;
+        return result;
     }
     
     /**
@@ -222,16 +246,34 @@ public class WorkerFactory {
      */
     public Set<Trigger> createTriggers(JobDefinition jobDefinition){
         
-        switch(jobDefinition.getScheduleType()){
-            case CRON:
-                return this.createCronTriggers(jobDefinition);
-            case STATIC_PERIOD:
-                return this.createStaticPeriodTriggers(jobDefinition);
-            case ONE_TIME:
-                return this.createOneTimeTriggers(jobDefinition);
-            default:
-                return Set.of();
+        // triggers to traverse
+        var triggers = jobDefinition.getTriggers();
+        
+        // nothing to process
+        if(triggers == null){
+            return Set.of();
         }
+        
+        // set of final triggers
+        var result = new HashSet<Trigger>();
+        
+        // convert triggers 
+        triggers.forEach(trigger -> {
+            
+            switch(trigger.getType()){
+                case CRON:
+                    result.addAll(this.cronTrigger(jobDefinition, trigger));
+                    break;
+                case STATIC_PERIOD:
+                    result.addAll(this.periodTrigger(jobDefinition, trigger));
+                    break;
+                case ONE_TIME:
+                    result.addAll(this.createOneTimeTriggers(jobDefinition, trigger));
+                    break;
+            }
+        });
+        
+        return result;
     }
     
     /**

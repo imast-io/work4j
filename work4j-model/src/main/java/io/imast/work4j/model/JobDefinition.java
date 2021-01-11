@@ -41,24 +41,9 @@ public class JobDefinition implements Serializable {
     private String type;
     
     /**
-     * The type of schedule
-     */
-    private JobScheduleType scheduleType;
-    
-    /**
-     * The static period to use in milliseconds
-     */
-    private Double period;
-    
-    /**
-     * The end time for job
-     */
-    private ZonedDateTime endAt;
-    
-    /**
      * The Cron schedule of request
      */
-    private List<CronTrigger> cronTriggers;
+    private List<TriggerDefinition> triggers;
     
     /**
      * The status of job
@@ -84,11 +69,6 @@ public class JobDefinition implements Serializable {
      * The Job Data
      */
     private JobData jobData;
-    
-    /**
-     * The job timezone
-     */
-    private String timezone;
     
     /**
      * The user that defined the job

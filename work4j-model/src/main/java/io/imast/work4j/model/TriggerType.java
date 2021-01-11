@@ -5,7 +5,7 @@ package io.imast.work4j.model;
  * 
  * @author davitp
  */
-public enum JobScheduleType {
+public enum TriggerType {
     
     /**
      * The static period schedule
