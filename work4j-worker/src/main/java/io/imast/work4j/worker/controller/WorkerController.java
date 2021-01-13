@@ -9,6 +9,7 @@ import io.imast.work4j.model.agent.AgentHealth;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -31,9 +32,9 @@ public class WorkerController {
     protected SchedulerChannel channel;
 
     /**
-     * The listener
+     * The supervisors
      */
-    private final WorkerListener listener;
+    private final List<WorkerSupervior> supervisors;
     
     /**
      * The worker configuration
@@ -55,13 +56,13 @@ public class WorkerController {
      * 
      * @param instance The quartz instance
      * @param channel The channel
-     * @param listener The worker listener
+     * @param supervisors The worker supervisors
      * @param config The worker configuration
      */
-    public WorkerController(QuartzInstance instance, SchedulerChannel channel, WorkerListener listener, WorkerConfiguration config){
+    public WorkerController(QuartzInstance instance, SchedulerChannel channel, List<WorkerSupervior> supervisors, WorkerConfiguration config){
         this.instance = instance;
         this.channel = channel;
-        this.listener = listener;
+        this.supervisors = supervisors;
         this.config = config;
         this.asyncExecutor = Executors.newScheduledThreadPool(1);
     }
@@ -74,7 +75,7 @@ public class WorkerController {
     public void initialize() throws WorkerException {
         
         // number of tries
-        var agentTries = this.config.getAgentRegistrationTries();
+        var agentTries = this.config.getWorkerRegistrationTries();
         
         // by default try N times
         if(agentTries == null || agentTries <= 0){
@@ -94,17 +95,23 @@ public class WorkerController {
      * Start worker
      */
     public void start(){
-                
-        // register listner function
-        this.listener.add(this::recieved);
+          
+        // subscribe to all supervisors
+        this.supervisors.forEach(supervisor -> {
+            // register listner function
+            supervisor.add(this::recieved);
+
+            // start listening
+            supervisor.start();
+        });
         
-        // start listening
-        this.listener.start();
-        
-        // if worker signal period is given 
-        if(this.config.getWorkerSignalRate() != null && !this.config.getWorkerSignalRate().isZero()){
-            this.asyncExecutor.scheduleAtFixedRate(() -> this.heartbeat(), 0, this.config.getWorkerSignalRate().toMillis(), TimeUnit.MILLISECONDS);
+        // if worker signal period is not given do not send heartbeats
+        if(this.config.getHeartbeatRate() == null || this.config.getHeartbeatRate() == 0){
+            return;
         }
+        
+        // heartbeat with given frequency
+        this.asyncExecutor.scheduleAtFixedRate(() -> this.heartbeat(), 0, this.config.getHeartbeatRate(), TimeUnit.MILLISECONDS);
     }
     
     /**
@@ -112,11 +119,14 @@ public class WorkerController {
      */
     public void stop(){
         
-        // stop listening
-        this.listener.stop();
-        
-        // remove handler
-        this.listener.remove(this::recieved); 
+        // subscribe to all supervisors
+        this.supervisors.forEach(supervisor -> {
+            // stop listening
+            supervisor.stop();
+            
+            // remove listner function
+            supervisor.remove(this::recieved);            
+        });
         
         // shutdown all async tasks
         this.asyncExecutor.shutdown();
@@ -177,10 +187,7 @@ public class WorkerController {
      * @return Returns created agent definition or null
      */
     protected AgentDefinition register(){
-        
-        // the agent signal rate
-        var singalRate = this.config.getWorkerSignalRate();
-        
+
         // now time
         var now = Zdt.utc();
         
@@ -193,9 +200,8 @@ public class WorkerController {
                 .worker(this.instance.getWorker())
                 .cluster(this.instance.getCluster())
                 .name(identity)
-                .supervisor(this.config.isSupervise())
                 .health(new AgentHealth(now, AgentActivityType.REGISTER))
-                .expectedSignalMinutes(singalRate.toSeconds() / 60.0)
+                .heartbeatFreq(this.config.getHeartbeatRate())
                 .registered(now)
                 .build();
         

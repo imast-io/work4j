@@ -1,6 +1,5 @@
 package io.imast.work4j.worker;
 
-import java.time.Duration;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,11 +17,6 @@ import lombok.NoArgsConstructor;
 public class WorkerConfiguration {
     
     /**
-     * Should supervise job management
-     */
-    private boolean supervise;
-    
-    /**
      * The agent name job manager runs on
      */
     private String worker;
@@ -38,19 +32,19 @@ public class WorkerConfiguration {
     private Long parallelism;
     
     /**
-     * The frequency of job sync
+     * The frequency of polling update (milliseconds)
      */
-    private Duration jobSyncRate;
+    private Long pollingRate;
     
     /**
-     * The frequency of agent updates
+     * The frequency of heartbeat update (milliseconds)
      */
-    private Duration workerSignalRate;
+    private Long heartbeatRate;
     
     /**
      * The maximum number of trying to register an agent 
      */
-    private Integer agentRegistrationTries;
+    private Integer workerRegistrationTries;
     
     /**
      * The type of clustering

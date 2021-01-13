@@ -9,6 +9,7 @@ import io.vavr.control.Try;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
@@ -34,7 +35,6 @@ public class WorkerFactory {
     /**
      * The map of job classes 
      */
-    @Getter
     protected final Map<String, Class> jobClasses;
     
     /**
@@ -42,6 +42,15 @@ public class WorkerFactory {
      */
     public WorkerFactory(){
         this.jobClasses = new HashMap<>();
+    }
+    
+    /**
+     * Get registered types
+     * 
+     * @return Returns set of types
+     */
+    public Set<String> getTypes(){
+        return this.jobClasses.keySet();
     }
     
     /**
