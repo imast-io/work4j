@@ -1,4 +1,4 @@
-package io.imast.work4j.worker.controller;
+package io.imast.work4j.channel;
 
 import io.imast.work4j.model.JobDefinition;
 import lombok.AllArgsConstructor;
