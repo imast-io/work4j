@@ -1,5 +1,6 @@
 package io.imast.work4j.worker.controller;
 
+import io.imast.work4j.channel.WorkerSupervior;
 import java.util.List;
 import java.util.Properties;
 import io.imast.core.Str;
