@@ -23,11 +23,6 @@ public class AgentDefinition {
     private String id;
     
     /**
-     * The supervisor
-     */
-    private Boolean supervisor;
-    
-    /**
      * The cluster name
      */
     private String cluster;
@@ -48,9 +43,9 @@ public class AgentDefinition {
     private AgentHealth health;
     
     /**
-     * The declared expectation of health signals
+     * The expected frequency of heartbeats in milliseconds
      */
-    private Double expectedSignalMinutes;
+    private Long heartbeatFreq;
         
     /**
      * The last signal from agent

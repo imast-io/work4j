@@ -7,7 +7,7 @@ import java.util.function.Consumer;
  * 
  * @author davitp
  */
-public interface WorkerListener {
+public interface WorkerSupervior {
     
     /**
      * Start listening for updates

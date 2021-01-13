@@ -1,12 +1,18 @@
-package io.imast.work4j.worker;
+package io.imast.work4j.worker.controller;
 
 import java.util.List;
 import java.util.Properties;
 import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.worker.ClusteringType;
+import io.imast.work4j.worker.JobConstants;
+import io.imast.work4j.worker.WorkerConfiguration;
+import io.imast.work4j.worker.WorkerException;
+import io.imast.work4j.worker.WorkerFactory;
 import io.imast.work4j.worker.instance.EveryJobListener;
 import io.imast.work4j.worker.instance.EveryTriggerListener;
 import io.imast.work4j.worker.instance.JobSchedulerListener;
+import io.imast.work4j.worker.instance.QuartzInstance;
 import io.vavr.control.Try;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +30,7 @@ import org.quartz.impl.StdSchedulerFactory;
  * 
  * @author davitp
  */
-public class QuartzWorkerBuilder {
+public class WorkerControllerBuilder {
    
     /**
      * The instance to configuration
@@ -57,6 +63,11 @@ public class QuartzWorkerBuilder {
     private final List<TriggerListener> triggerListeners;
     
     /**
+     * The set of worker supervisors
+     */
+    private final List<WorkerSupervior> supervisors;
+    
+    /**
      * The cluster name
      */
     private final String cluster;
@@ -76,11 +87,12 @@ public class QuartzWorkerBuilder {
      * 
      * @param config The configuration instance
      */
-    private QuartzWorkerBuilder(WorkerConfiguration config){
+    private WorkerControllerBuilder(WorkerConfiguration config){
         this.config = config;
         this.schedulerListeners = new ArrayList<>();
         this.jobListeners = new ArrayList<>();
         this.triggerListeners = new ArrayList<>();
+        this.supervisors = new ArrayList<>();
         this.cluster = Str.blank(this.config.getCluster()) ? JobConstants.DEFAULT_CLUSTER : this.config.getCluster();
         this.worker = Str.blank(this.config.getWorker()) ? UUID.randomUUID().toString() : this.config.getWorker();
         this.factory = new WorkerFactory();
@@ -93,8 +105,8 @@ public class QuartzWorkerBuilder {
      * @param config The configuration instance
      * @return Returns an instance to builder for chaining
      */
-    public static QuartzWorkerBuilder builder(WorkerConfiguration config){
-        return new QuartzWorkerBuilder(config);
+    public static WorkerControllerBuilder builder(WorkerConfiguration config){
+        return new WorkerControllerBuilder(config);
     }
     
     /**
@@ -103,7 +115,7 @@ public class QuartzWorkerBuilder {
      * @param channel The channel instance
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder withChannel(SchedulerChannel channel){
+    public WorkerControllerBuilder withChannel(SchedulerChannel channel){
         this.schedulerChannel = channel;
         return this;
     }
@@ -115,7 +127,7 @@ public class QuartzWorkerBuilder {
      * @param clazz The job class instance
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder withJob(String type, Class clazz){
+    public WorkerControllerBuilder withJob(String type, Class clazz){
         this.factory.registerJobClass(type, clazz);
         return this;
     }
@@ -128,7 +140,7 @@ public class QuartzWorkerBuilder {
      * @param module The module instance or supplier
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder withModule(String type, String key, Object module){
+    public WorkerControllerBuilder withModule(String type, String key, Object module){
         this.registerModule(type, key, module);
         return this;
     }
@@ -139,7 +151,7 @@ public class QuartzWorkerBuilder {
      * @param listener The listener to attach
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder withListener(SchedulerListener listener){
+    public WorkerControllerBuilder withListener(SchedulerListener listener){
         this.schedulerListeners.add(listener);
         return this;
     }
@@ -150,7 +162,7 @@ public class QuartzWorkerBuilder {
      * @param listener The listener to attach
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder withListener(JobListener listener){
+    public WorkerControllerBuilder withListener(JobListener listener){
         this.jobListeners.add(listener);
         return this;
     }
@@ -161,8 +173,19 @@ public class QuartzWorkerBuilder {
      * @param listener The listener to attach
      * @return Returns builder for chaining
      */
-    public QuartzWorkerBuilder withListener(TriggerListener listener){
+    public WorkerControllerBuilder withListener(TriggerListener listener){
         this.triggerListeners.add(listener);
+        return this;
+    }
+    
+    /**
+     * Use the given supervisor
+     * 
+     * @param supervisor The supervisor to add
+     * @return Returns builder for chaining
+     */
+    public WorkerControllerBuilder withSupervisor(WorkerSupervior supervisor){
+        this.supervisors.add(supervisor);
         return this;
     }
     
@@ -290,5 +313,38 @@ public class QuartzWorkerBuilder {
         }
                 
         return scheduler;
+    }
+    
+    /**
+     * Build a ready-to-use worker controller
+     * 
+     * @return Returns worker controller
+     * @throws io.imast.work4j.worker.WorkerException
+     */
+    public WorkerController build() throws WorkerException {
+        
+        // validate factory
+        if(this.factory == null){
+            throw new WorkerException("Worker Factory is required");
+        }
+        
+        // create a scheduler instance
+        var scheduler = this.initScheduler();
+     
+        // list of supervisors
+        var allSupervisors = new ArrayList<WorkerSupervior>();
+        
+        // create a quartz instance
+        var instance = new QuartzInstance(this.worker, this.cluster, scheduler, this.factory);
+        
+        // if polling rate is specified create a supervisor
+        if(this.config.getPollingRate() != null && this.config.getPollingRate() > 0){
+            allSupervisors.add(new PollingSupervisor(instance, this.schedulerChannel, this.config));
+        }
+        
+        // add rest of supervisors
+        allSupervisors.addAll(this.supervisors);
+        
+        return new WorkerController(instance, this.schedulerChannel, allSupervisors, this.config);
     }
 }

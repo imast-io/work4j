@@ -10,6 +10,9 @@ import io.imast.work4j.worker.WorkerFactory;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Getter;
 import org.quartz.JobKey;
 import org.quartz.Scheduler;
@@ -136,6 +139,46 @@ public class QuartzInstance {
         synchronized(this.scheduler){
             this.unscheduleImpl(code, group);
         }
+    }
+    
+    /**
+     * Gets all group names
+     * 
+     * @return Returns group names
+     * @throws io.imast.work4j.worker.WorkerException
+     */
+    public List<String> getGroups() throws WorkerException{
+        try { 
+            return this.scheduler.getJobGroupNames();
+        }
+        catch(SchedulerException ex){
+            throw new WorkerException("Unable to read job group names", ex);
+        }
+    }
+    
+    /**
+     * Gets all jobs in the group
+     * 
+     * @param group The group to select
+     * @return Returns jobs in group
+     * @throws io.imast.work4j.worker.WorkerException
+     */
+    public Set<String> getJobs(String group) throws WorkerException{
+        try { 
+            return this.scheduler.getJobKeys(GroupMatcher.groupEquals(group)).stream().map(k -> k.getName()).collect(Collectors.toSet());
+        }
+        catch(SchedulerException ex){
+            throw new WorkerException("Unable to read job group names", ex);
+        }
+    }
+    
+    /**
+     * Get registered types
+     * 
+     * @return Returns set of types
+     */
+    public Set<String> getTypes(){
+        return this.factory.getTypes();
     }
     
     /**
