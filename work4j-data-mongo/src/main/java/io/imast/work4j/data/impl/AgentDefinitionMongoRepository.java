@@ -23,7 +23,7 @@ public class AgentDefinitionMongoRepository extends BaseMongoRepository<String, 
      * @param mongoDatabase The underlying mongo database
      */
     public AgentDefinitionMongoRepository(MongoDatabase mongoDatabase){
-        super(mongoDatabase, "agent_definitions", AgentDefinition.class);
+        super(mongoDatabase, "work4j_agent_definitions", AgentDefinition.class);
     }
     
     /**

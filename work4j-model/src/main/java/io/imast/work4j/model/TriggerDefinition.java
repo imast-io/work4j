@@ -1,5 +1,6 @@
 package io.imast.work4j.model;
 
+import java.io.Serializable;
 import java.time.ZonedDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -15,7 +16,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TriggerDefinition {
+public class TriggerDefinition implements Serializable {
     
     /**
      * The trigger name

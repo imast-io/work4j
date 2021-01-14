@@ -43,16 +43,15 @@
         <dependency>
             <groupId>io.imast</groupId>
             <artifactId>work4j-model</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
         </dependency>
          
         <dependency>
             <groupId>io.imast</groupId>
             <artifactId>work4j-channel</artifactId>
-            <version>${revision}</version>
+            <version>${project.version}</version>
         </dependency>
           
-        
     </dependencies>
     
 </project>

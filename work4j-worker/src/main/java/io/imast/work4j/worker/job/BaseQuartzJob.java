@@ -2,7 +2,7 @@ package io.imast.work4j.worker.job;
 
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.worker.JobConstants;
-import lombok.extern.slf4j.Slf4j;
+import java.util.Map;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
 
@@ -11,7 +11,6 @@ import org.quartz.JobExecutionContext;
  * 
  * @author davitp
  */
-@Slf4j
 public abstract class BaseQuartzJob implements Job {
     
     /**
@@ -22,6 +21,22 @@ public abstract class BaseQuartzJob implements Job {
      */
     protected JobDefinition getJobDefinition(JobExecutionContext executionContext){
         return JobOps.getJobDefinition(executionContext);
+    }
+    
+    /**
+     * Get the job definition
+     * 
+     * @param executionContext The execution context
+     * @return Returns the job definition
+     */
+    protected Map<String, Object> getData(JobExecutionContext executionContext){
+        var def = JobOps.getJobDefinition(executionContext);
+        
+        if(def != null && def.getJobData() != null && def.getJobData().getData() != null){
+            return def.getJobData().getData();
+        }
+        
+        return Map.of();
     }
     
     /**

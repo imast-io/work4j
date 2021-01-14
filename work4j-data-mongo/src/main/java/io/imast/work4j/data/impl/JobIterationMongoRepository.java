@@ -35,7 +35,7 @@ public class JobIterationMongoRepository extends BaseMongoRepository<String, Job
      * @param mongoDatabase The underlying mongo database
      */
     public JobIterationMongoRepository(MongoDatabase mongoDatabase){
-        super(mongoDatabase, "job_iterations", JobIteration.class);
+        super(mongoDatabase, "work4j_job_iterations", JobIteration.class);
     }
     
     /**

@@ -7,15 +7,18 @@ import com.mongodb.client.model.Indexes;
 import static com.mongodb.client.model.Sorts.*;
 import io.imast.core.Coll;
 import io.imast.core.Str;
+import io.imast.core.Zdt;
 import io.imast.core.mongo.BaseMongoRepository;
 import io.imast.core.mongo.SimplePojoRegistries;
 import io.imast.core.mongo.StringIdGenerator;
 import io.imast.work4j.data.JobDefinitionRepository;
+import io.imast.work4j.model.JobData;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobRequestResult;
 import io.imast.work4j.model.JobStatus;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.bson.conversions.Bson;
 import java.util.stream.Collectors;
@@ -35,7 +38,7 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
      * @param mongoDatabase The underlying mongo database
      */
     public JobDefinitionMongoRepository(MongoDatabase mongoDatabase){
-        super(mongoDatabase, "job_definitions", JobDefinition.class);
+        super(mongoDatabase, "work4j_job_definitions", JobDefinition.class);
     }
     
     /**
@@ -192,7 +195,71 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
      */
     @Override
     public Optional<JobDefinition> update(JobDefinition jobDefinition) {
-        return this.upsert(jobDefinition, j -> j.getId());
+        
+        // try find existing job
+        Optional<JobDefinition> existing = this.getById(jobDefinition.getId());
+        
+        // do not create if created
+        if(!existing.isPresent()){
+            return Optional.empty();
+        }
+        
+        // building the definition
+        var definitionBuilder = jobDefinition.toBuilder()
+                .created(existing.get().getCreated())
+                .createdBy(existing.get().getCreatedBy())
+                .modified(Zdt.utc())
+                .status(jobDefinition.getStatus() == null ? JobStatus.ACTIVE : jobDefinition.getStatus())
+                .cluster(jobDefinition.getCluster()== null ? "DEFAULT_CLUSTER" : jobDefinition.getCluster());
+                
+                
+        // make sure job data is there
+        if(jobDefinition.getJobData() == null || jobDefinition.getJobData().getData() == null){
+            definitionBuilder.jobData(new JobData(Map.of()));
+        }
+        
+        return super.upsert(definitionBuilder.build(), j -> j.getId());
+    }
+    
+    /**
+     * Inserts job definition into a collection
+     * 
+     * @param jobDefinition The job definition to insert
+     * @return Returns saved entity if success
+     */
+    @Override
+    public Optional<JobDefinition> insert(JobDefinition jobDefinition){
+        
+        // clone definition
+        var definition = jobDefinition.toBuilder().build();
+        
+        // use code as ID to set
+        definition.setId(definition.getCode());
+        
+        // try find existing job
+        Optional<JobDefinition> existing = this.getById(definition.getId());
+        
+        // do not create if created
+        if(existing.isPresent()){
+            return Optional.empty();
+        }
+        
+        // set creation and modification times
+        definition.setCreated(Zdt.utc());
+        definition.setModified(Zdt.utc());
+        
+        // set default status if missing
+        definition.setStatus(definition.getStatus() == null ? JobStatus.ACTIVE : definition.getStatus());
+        
+        // assign to the default agent if not given
+        definition.setCluster(definition.getCluster()== null ? "DEFAULT_CLUSTER" : definition.getCluster());
+        
+        // make sure job data is there
+        if(definition.getJobData() == null || definition.getJobData().getData() == null){
+            definition.setJobData(new JobData(Map.of()));
+        }
+        
+        return super.insert(definition);
     }
     
     /**
@@ -204,7 +271,7 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
     public boolean prepare() {
         
         // create named index if does not exist
-        var result = this.getCollection().createIndex(Indexes.ascending("core"), new IndexOptions().name("jobs_by_code"));
+        var result = this.getCollection().createIndex(Indexes.ascending("code"), new IndexOptions().name("jobs_by_code"));
         
         // valid name returned
         return !Str.blank(result);
