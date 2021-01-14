@@ -9,11 +9,9 @@ import io.vavr.control.Try;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.CronExpression;
 import org.quartz.CronScheduleBuilder;
@@ -161,7 +159,7 @@ public class WorkerFactory {
             .withSchedule(schedule);
 
         // if start time is given
-        if(trigger.getStartAt()!= null){
+        if(trigger.getStartAt() != null){
             triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
         }
         
@@ -205,7 +203,7 @@ public class WorkerFactory {
                 .withSchedule(SimpleScheduleBuilder.repeatSecondlyForever(periodSecond));
         
         // if start time is given
-        if(trigger.getStartAt()!= null){
+        if(trigger.getStartAt() != null){
             triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
         }
         

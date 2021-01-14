@@ -227,6 +227,8 @@ public class QuartzInstance {
             
             // add job to scheduler;
             this.scheduler.scheduleJob(jobDetail, triggers, true);
+            
+            log.debug(String.format("QuartzInstance: Job %s is scheduled", jobDefinition.getCode()));
         }
         catch(SchedulerException error){
             log.error("QuartzInstance: Failed to schedule the job", error);
@@ -273,6 +275,8 @@ public class QuartzInstance {
             
             // add job to scheduler;
             this.scheduler.scheduleJob(jobDetail, triggers, true);
+            
+            log.debug(String.format("QuartzInstance: Job %s is rescheduled", jobDefinition.getCode()));
         }
         catch(SchedulerException error){
             log.error("QuartzInstance: Failed to schedule the job", error);
@@ -306,6 +310,8 @@ public class QuartzInstance {
             
             // remove job
             this.scheduler.deleteJob(key);
+
+            log.debug(String.format("QuartzInstance: Job %s is unscheduled", jobCode));
         }
         catch (SchedulerException error){
             log.error("QuartzInstance: Failed to unschedule the job", error);

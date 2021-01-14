@@ -1,5 +1,6 @@
 package io.imast.work4j.model;
 
+import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class JobExecutionOptions {
+public class JobExecutionOptions implements Serializable {
     
     /**
      * The option controls reporting iteration results to controller.

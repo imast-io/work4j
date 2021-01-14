@@ -96,9 +96,12 @@ public class WorkerController {
     
     /**
      * Start worker
+     * @throws io.imast.work4j.worker.WorkerException
      */
-    public void start(){
+    public void start() throws WorkerException{
           
+        this.instance.start();
+        
         // subscribe to all supervisors
         this.supervisors.forEach(supervisor -> {
             // register listner function
@@ -119,8 +122,11 @@ public class WorkerController {
     
     /**
      * Stop worker
+     * @throws io.imast.work4j.worker.WorkerException
      */
-    public void stop(){
+    public void stop() throws WorkerException{
+        
+        this.instance.stop();
         
         // subscribe to all supervisors
         this.supervisors.forEach(supervisor -> {
