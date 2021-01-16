@@ -39,23 +39,48 @@ public class JobOps {
     }
     
     /**
-     * Get the job definition
+     * Get the payload data value
      * 
-     * @param jobDataMap The job data map
-     * @return Returns the job definition
+     * @param <T> The type of value
+     * @param data The data object to get from
+     * @param key The key of data entry
+     * @return Returns the job entry value
      */
-    public static JobDefinition getJobDefinition(JobDataMap jobDataMap){
+    public static <T> T getValue(JobDataMap data, String key){
        
-        // the data by key
-        var def = Try.of(() -> jobDataMap.get(JobConstants.JOB_DEFINITION)).getOrElse(() -> null);
+        // the value by key
+        var value = data.getOrDefault(key, null);
         
-        // check if data is not valid
-        if(def == null || !(def instanceof JobDefinition)){
-            log.error("JobOps: Unable to get the job definition.");
+        // get value
+        if(value == null){
             return null;
         }
         
-        return (JobDefinition) def;
+        // the final value
+        return Lang.<T>safeCast(value);
+    }
+    
+    /**
+     * Get the payload data value
+     * 
+     * @param <T> The type of value
+     * @param data The data object to get from
+     * @param key The key of data entry
+     * @param defaultValue The default value
+     * @return Returns the job entry value
+     */
+    public static <T> T getValueOr(JobDataMap data, String key, T defaultValue){
+       
+        // the value by key
+        var value = data.getOrDefault(key, defaultValue);
+        
+        // get value
+        if(value == null){
+            return null;
+        }
+        
+        // the final value
+        return Lang.<T>safeCast(value);
     }
     
     /**

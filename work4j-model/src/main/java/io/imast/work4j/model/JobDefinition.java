@@ -41,6 +41,11 @@ public class JobDefinition implements Serializable {
     private String type;
     
     /**
+     * The job tenant
+     */
+    private String tenant;
+    
+    /**
      * The Cron schedule of request
      */
     private List<TriggerDefinition> triggers;
@@ -66,9 +71,9 @@ public class JobDefinition implements Serializable {
     private Map<String, String> selectors;
     
     /**
-     * The Job Data
+     * The job data payload
      */
-    private JobData jobData;
+    private Map<String, Object> payload;
     
     /**
      * The user that defined the job

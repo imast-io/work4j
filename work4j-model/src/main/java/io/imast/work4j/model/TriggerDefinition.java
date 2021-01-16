@@ -2,6 +2,7 @@ package io.imast.work4j.model;
 
 import java.io.Serializable;
 import java.time.ZonedDateTime;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -47,6 +48,11 @@ public class TriggerDefinition implements Serializable {
      * The end time for trigger
      */
     private ZonedDateTime endAt;
+    
+    /**
+     * The trigger data payload
+     */
+    private Map<String, Object> payload;
     
     /**
      * The job timezone

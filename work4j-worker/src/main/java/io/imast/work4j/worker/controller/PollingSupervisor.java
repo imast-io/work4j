@@ -157,7 +157,7 @@ public class PollingSupervisor implements WorkerSupervior {
             // for each job in group raise unschedule uperation
             Try.of(() -> this.instance.getJobs(running))
                     .getOrElse(Set.of())
-                    .forEach(code -> this.raise(new WorkerUpdateMessage(UpdateOperation.REMOVE, code, running, null, null)));
+                    .forEach(code -> this.raise(new WorkerUpdateMessage(UpdateOperation.REMOVE, code, running, null)));
         });
         
         // types of jobs
@@ -195,17 +195,17 @@ public class PollingSupervisor implements WorkerSupervior {
 
         // unschedule all the removed jobs
         statusUpdate.getRemoved().forEach((removedJob) -> {
-            this.raise(new WorkerUpdateMessage(UpdateOperation.REMOVE, removedJob, statusUpdate.getGroup(), null, null));
+            this.raise(new WorkerUpdateMessage(UpdateOperation.REMOVE, removedJob, statusUpdate.getGroup(), null));
         });
 
         // schedule added jobs
         statusUpdate.getAdded().values().forEach(job -> {
-            this.raise(new WorkerUpdateMessage(UpdateOperation.ADD, job.getCode(), job.getGroup(), job, null));
+            this.raise(new WorkerUpdateMessage(UpdateOperation.ADD, job.getCode(), job.getGroup(), job));
         });
         
         // schedule updated jobs
         statusUpdate.getUpdated().values().forEach(job -> {
-            this.raise(new WorkerUpdateMessage(UpdateOperation.UPDATE, job.getCode(), job.getGroup(), job, null));
+            this.raise(new WorkerUpdateMessage(UpdateOperation.UPDATE, job.getCode(), job.getGroup(), job));
         });
     }
     

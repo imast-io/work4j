@@ -20,15 +20,8 @@ public class DryRunJob extends BaseQuartzJob {
      * @param arg0 The job execution context
      * @throws JobExecutionException 
      */
-    private void executeImpl(JobExecutionContext arg0) throws JobExecutionException {
-        
-        // get job definition
-        var definition = this.getJobDefinition(arg0);
-        
-        // get code from job 
-        var code = definition == null ? "NO_DEFINITION" : definition.getCode();
-        
-        log.info(String.format("Executed dry-run job %s at %s", code, Zdt.now(ZoneId.systemDefault().toString())));
+    private void executeImpl(JobExecutionContext arg0) throws JobExecutionException {        
+        log.info(String.format("Executed dry-run job %s at %s", this.getCode(arg0), Zdt.now(ZoneId.systemDefault().toString())));
     }
     
     
