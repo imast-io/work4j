@@ -34,4 +34,9 @@ public class WorkerUpdateMessage {
      * The definition itself in case of insert/update
      */
     private JobDefinition definition;
+    
+    /**
+     * The previous version of job definitions
+     */
+    private JobDefinition previous;
 }
