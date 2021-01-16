@@ -23,6 +23,51 @@ public class JobConstants {
     public static final String JOB_DEFINITION = "DEFINITION";
     
     /**
+     * The job id key
+     */
+    public static final String PAYLOAD_JOB_ID = "_PLD_JOB_ID";
+    
+    /**
+     * The job code key
+     */
+    public static final String PAYLOAD_JOB_CODE = "_PLD_JOB_CODE";
+    
+    /**
+     * The job group key
+     */
+    public static final String PAYLOAD_JOB_GROUP = "_PLD_JOB_GROUP";
+    
+    /**
+     * The job type key
+     */
+    public static final String PAYLOAD_JOB_TYPE = "_PLD_JOB_TYPE";
+    
+    /**
+     * The job tenant key
+     */
+    public static final String PAYLOAD_JOB_TENANT = "_PLD_JOB_TENANT";
+    
+    /**
+     * The job status key
+     */
+    public static final String PAYLOAD_JOB_STATUS = "_PLD_JOB_STATUS";
+    
+    /**
+     * The job cluster key
+     */
+    public static final String PAYLOAD_JOB_CLUSTER = "_PLD_JOB_CLUSTER";
+    
+    /**
+     * The job created key
+     */
+    public static final String PAYLOAD_JOB_CREATED = "_PLD_JOB_CREATED";
+    
+    /**
+     * The job modified key
+     */
+    public static final String PAYLOAD_JOB_MODIFIED = "_PLD_JOB_MODIFIED";
+    
+    /**
      * The job modules
      */
     public static final String JOB_MODULES = "JOB_MODULES";

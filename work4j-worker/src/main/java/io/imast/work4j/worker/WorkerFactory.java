@@ -84,9 +84,41 @@ public class WorkerFactory {
                 .withIdentity(key)
                 .storeDurably(false)
                 .build();
+        
+        return job;
+    }
+    
+    /**
+     * Creates the job corresponding to the definition
+     * 
+     * @param job The job to init
+     * @param definition The job definition 
+     * @return Returns job details instance
+     */
+    public JobDetail initJob(JobDetail job, JobDefinition definition){
 
-        // add definition to data map
-        job.getJobDataMap().put(JobConstants.JOB_DEFINITION, jobDefinition);
+        // the data map
+        var systemData = new HashMap<String, Object>();
+        
+        // populte system data
+        systemData.put(JobConstants.PAYLOAD_JOB_ID, definition.getId());
+        systemData.put(JobConstants.PAYLOAD_JOB_CODE, definition.getCode());
+        systemData.put(JobConstants.PAYLOAD_JOB_GROUP, definition.getGroup());
+        systemData.put(JobConstants.PAYLOAD_JOB_TYPE, definition.getType());
+        systemData.put(JobConstants.PAYLOAD_JOB_TENANT, definition.getTenant());
+        systemData.put(JobConstants.PAYLOAD_JOB_STATUS, definition.getStatus());
+        systemData.put(JobConstants.PAYLOAD_JOB_CLUSTER, definition.getCluster());
+        systemData.put(JobConstants.PAYLOAD_JOB_CREATED, definition.getCreated());
+        systemData.put(JobConstants.PAYLOAD_JOB_MODIFIED, definition.getModified());
+        
+        // add all system data
+        job.getJobDataMap().putAll(systemData);
+        
+        // check if there is payload in job definition populate in data
+        if(definition.getPayload() != null){
+            // add all payload data
+            job.getJobDataMap().putAll(definition.getPayload());
+        }
         
         return job;
     }
@@ -268,17 +300,32 @@ public class WorkerFactory {
         // convert triggers 
         triggers.forEach(trigger -> {
             
+            // the trigger payload
+            Map<String, Object> triggerPayload = trigger.getPayload() == null ? Map.of() : trigger.getPayload();
+            
+            // quartz triggers
+            Set<Trigger> quartzTriggers = Set.of();
+            
+            // process based on type
             switch(trigger.getType()){
                 case CRON:
-                    result.addAll(this.cronTrigger(jobDefinition, trigger));
+                    quartzTriggers = this.cronTrigger(jobDefinition, trigger);
                     break;
                 case STATIC_PERIOD:
-                    result.addAll(this.periodTrigger(jobDefinition, trigger));
+                    quartzTriggers = this.periodTrigger(jobDefinition, trigger);
                     break;
                 case ONE_TIME:
-                    result.addAll(this.createOneTimeTriggers(jobDefinition, trigger));
+                    quartzTriggers = this.createOneTimeTriggers(jobDefinition, trigger);
                     break;
             }
+            
+            // attach data
+            quartzTriggers.forEach(quartzTrigger -> {
+                quartzTrigger.getJobDataMap().putAll(triggerPayload);
+            });
+            
+            // add quartz triggers
+            result.addAll(quartzTriggers);
         });
         
         return result;

@@ -3,6 +3,9 @@ package io.imast.work4j.controller;
 import io.imast.core.Str;
 import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.channel.UpdateOperation;
+import io.imast.work4j.channel.WorkerUpdateMessage;
+import io.imast.work4j.channel.notify.WorkerPublisher;
 import io.imast.work4j.data.AgentDefinitionRepository;
 import io.imast.work4j.data.JobDefinitionRepository;
 import io.imast.work4j.data.JobIterationRepository;
@@ -34,7 +37,7 @@ import lombok.extern.slf4j.Slf4j;
  * @author davitp
  */
 @Slf4j
-public class JobSchedulerCtl implements SchedulerChannel {
+public class SchedulerController implements SchedulerChannel {
 
     /**
      * The job definition repository
@@ -50,6 +53,11 @@ public class JobSchedulerCtl implements SchedulerChannel {
      * The agent definitions repository
      */
     protected final AgentDefinitionRepository agents;
+    
+    /**
+     * The set of worker publishers
+     */
+    protected final List<WorkerPublisher> workerPublishers;
    
     /**
      * Creates new instance of Scheduler Job Controller
@@ -57,11 +65,13 @@ public class JobSchedulerCtl implements SchedulerChannel {
      * @param definitions The job definition repository
      * @param iterations The job iterations repository
      * @param agents The agent definition repository
+     * @param workerPublishers The set of worker publishers
      */
-    public JobSchedulerCtl(JobDefinitionRepository definitions, JobIterationRepository iterations, AgentDefinitionRepository agents){
+    public SchedulerController(JobDefinitionRepository definitions, JobIterationRepository iterations, AgentDefinitionRepository agents, List<WorkerPublisher> workerPublishers){
         this.definitions = definitions;
         this.iterations = iterations;
         this.agents = agents;
+        this.workerPublishers = new ArrayList<>(workerPublishers);
     }
     
     /**
@@ -69,7 +79,7 @@ public class JobSchedulerCtl implements SchedulerChannel {
      * 
      * @return Returns initialization result
      */
-    public JobSchedulerCtl initialize(){
+    public SchedulerController initialize(){
         
         // prepare agents
         this.agents.prepare();
@@ -259,7 +269,14 @@ public class JobSchedulerCtl implements SchedulerChannel {
      */
     public Optional<JobDefinition> addJob(JobDefinition definition){
         // insert job definition
-        return this.definitions.insert(definition);
+        var inserted = this.definitions.insert(definition);
+        
+        // publish if needed
+        if(inserted.isPresent()){
+            this.publishWorkerUpdate(new WorkerUpdateMessage(UpdateOperation.ADD, inserted.get().getCode(), inserted.get().getGroup(), inserted.get()));
+        }
+        
+        return inserted;
     }
     
     /**
@@ -268,9 +285,51 @@ public class JobSchedulerCtl implements SchedulerChannel {
      * @param definition The job definition to update
      * @return Returns job definition
      */
-    public Optional<JobDefinition> updateJob(JobDefinition definition){        
+    public Optional<JobDefinition> updateJob(JobDefinition definition){ 
+        
+        // get existing definition
+        var existing = this.getJob(definition.getId());
+        
+        // nothing to update
+        if(!existing.isPresent()){
+            return Optional.empty();
+        }
+        
         // update job definition
-        return this.definitions.update(definition);
+        var updated = this.definitions.update(definition);
+        
+        // nothing to do more
+        if(!updated.isPresent()){
+            return updated;
+        }
+        
+        // the previous status
+        var prevStatus = existing.get().getStatus();
+        
+        // the new status
+        var newStatus = updated.get().getStatus();
+        
+        // if was inactive and remains inactive do nothing
+        if(prevStatus != JobStatus.ACTIVE && newStatus != JobStatus.ACTIVE){
+            return updated;
+        }
+        
+        // if remains active
+        if(prevStatus == JobStatus.ACTIVE && newStatus == JobStatus.ACTIVE){
+            this.publishWorkerUpdate(new WorkerUpdateMessage(UpdateOperation.UPDATE, updated.get().getCode(), updated.get().getGroup(), updated.get()));
+        }
+        
+        // if becomes inactive
+        if(prevStatus == JobStatus.ACTIVE && newStatus != JobStatus.ACTIVE){
+            this.publishWorkerUpdate(new WorkerUpdateMessage(UpdateOperation.REMOVE, updated.get().getCode(), updated.get().getGroup(), null));
+        }
+        
+        // if becomes active
+        if(prevStatus == JobStatus.ACTIVE && newStatus != JobStatus.ACTIVE){
+            this.publishWorkerUpdate(new WorkerUpdateMessage(UpdateOperation.ADD, updated.get().getCode(), updated.get().getGroup(), updated.get()));
+        }
+        
+        return updated;
     }
     
     /**
@@ -290,7 +349,15 @@ public class JobSchedulerCtl implements SchedulerChannel {
      * @return Returns deleted job definition
      */
     public Optional<JobDefinition> deleteJob(String id){
-        return this.definitions.deleteById(id);
+        var deleted = this.definitions.deleteById(id);
+        
+        if(!deleted.isPresent()){
+            return deleted;
+        }
+        
+        this.publishWorkerUpdate(new WorkerUpdateMessage(UpdateOperation.REMOVE, deleted.get().getCode(), deleted.get().getGroup(), null));    
+        
+        return deleted;
     }
     
     /**
@@ -361,5 +428,14 @@ public class JobSchedulerCtl implements SchedulerChannel {
      */
     public Optional<AgentDefinition> deleteAgent(String id){
         return this.agents.deleteById(id);
+    }
+    
+    /**
+     * Publishes worker update
+     * 
+     * @param message The message to publish
+     */
+    protected void publishWorkerUpdate(WorkerUpdateMessage message){
+        this.workerPublishers.forEach(pub -> pub.publish(message));
     }
 }

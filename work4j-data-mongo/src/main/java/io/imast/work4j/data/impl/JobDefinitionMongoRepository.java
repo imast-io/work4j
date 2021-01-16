@@ -12,13 +12,11 @@ import io.imast.core.mongo.BaseMongoRepository;
 import io.imast.core.mongo.SimplePojoRegistries;
 import io.imast.core.mongo.StringIdGenerator;
 import io.imast.work4j.data.JobDefinitionRepository;
-import io.imast.work4j.model.JobData;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobRequestResult;
 import io.imast.work4j.model.JobStatus;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.bson.conversions.Bson;
 import java.util.stream.Collectors;
@@ -211,12 +209,6 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
                 .modified(Zdt.utc())
                 .status(jobDefinition.getStatus() == null ? JobStatus.ACTIVE : jobDefinition.getStatus())
                 .cluster(jobDefinition.getCluster()== null ? "DEFAULT_CLUSTER" : jobDefinition.getCluster());
-                
-                
-        // make sure job data is there
-        if(jobDefinition.getJobData() == null || jobDefinition.getJobData().getData() == null){
-            definitionBuilder.jobData(new JobData(Map.of()));
-        }
         
         return super.upsert(definitionBuilder.build(), j -> j.getId());
     }
@@ -253,12 +245,7 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
         
         // assign to the default agent if not given
         definition.setCluster(definition.getCluster()== null ? "DEFAULT_CLUSTER" : definition.getCluster());
-        
-        // make sure job data is there
-        if(definition.getJobData() == null || definition.getJobData().getData() == null){
-            definition.setJobData(new JobData(Map.of()));
-        }
-        
+                
         return super.insert(definition);
     }
     

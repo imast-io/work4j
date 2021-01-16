@@ -7,6 +7,7 @@ import io.imast.work4j.model.exchange.JobStatusExchangeRequest;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.WorkerFactory;
+import io.imast.work4j.worker.job.JobOps;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -222,6 +223,9 @@ public class QuartzInstance {
                 return;
             }
             
+            // init data
+            this.factory.initJob(jobDetail, jobDefinition);
+            
             // create triggers
             var triggers = this.factory.createTriggers(jobDefinition);
             
@@ -264,8 +268,8 @@ public class QuartzInstance {
                 return;
             }
             
-            // update definition to data map
-            jobDetail.getJobDataMap().put(JobConstants.JOB_DEFINITION, jobDefinition);
+            // init data
+            this.factory.initJob(jobDetail, jobDefinition);
             
             // unschedule the triggers
             this.unscheduleTriggers(key);
@@ -368,20 +372,22 @@ public class QuartzInstance {
                 var job = this.scheduler.getJobDetail(jobKey);
                 
                 // skip if not available
-                if(job == null || !job.getJobDataMap().containsKey(JobConstants.JOB_DEFINITION)){
+                if(job == null){
                     continue;
                 }
                 
-                // the job definition
-                var jobDefinition = (JobDefinition) job.getJobDataMap().get(JobConstants.JOB_DEFINITION);
+                // get job attributes
+                String jobCode = JobOps.getValue(job.getJobDataMap(), JobConstants.PAYLOAD_JOB_CODE);
+                String jobType = JobOps.getValue(job.getJobDataMap(), JobConstants.PAYLOAD_JOB_TYPE);
+                ZonedDateTime jobModified = JobOps.getValue(job.getJobDataMap(), JobConstants.PAYLOAD_JOB_MODIFIED);
                 
                 // skip jobs of other types
-                if(!Str.eq(jobDefinition.getType(), type)){
+                if(!Str.eq(jobType, type)){
                     continue;
                 }
                 
                 // record last modified time
-                status.put(jobDefinition.getCode(), jobDefinition.getModified());
+                status.put(jobCode, jobModified);
             }
         }
         catch(SchedulerException error){
