@@ -42,7 +42,7 @@ public interface JobDefinitionRepository  {
      * @param size The page size
      * @return Returns a page of job definitions
      */
-    public JobRequestResult<JobDefinition> getPageByCode(int page, int size);
+    public JobRequestResult getPageByCode(int page, int size);
             
     /**
      * Find all jobs by type
