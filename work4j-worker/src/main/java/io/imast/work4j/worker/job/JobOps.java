@@ -19,26 +19,6 @@ import org.quartz.JobExecutionContext;
 public class JobOps {
     
     /**
-     * Get the job definition
-     * 
-     * @param executionContext The execution context
-     * @return Returns the job definition
-     */
-    public static JobDefinition getJobDefinition(JobExecutionContext executionContext){
-       
-        // the data by key
-        var def = Try.of(() -> executionContext.getJobDetail().getJobDataMap().get(JobConstants.JOB_DEFINITION)).getOrElse(() -> null);
-        
-        // check if data is not valid
-        if(def == null || !(def instanceof JobDefinition)){
-            log.error("JobOps: Unable to get the job definition.");
-            return null;
-        }
-        
-        return (JobDefinition) def;
-    }
-    
-    /**
      * Get the payload data value
      * 
      * @param <T> The type of value
