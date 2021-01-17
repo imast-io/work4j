@@ -15,12 +15,12 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class JobRequestResult<T extends JobDefinition> implements Serializable { 
+public class JobRequestResult implements Serializable { 
     
     /**
      * The set of result jobs
      */
-    private List<T> jobs;
+    private List<JobDefinition> jobs;
     
     /**
      * The total number of jobs

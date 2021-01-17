@@ -367,7 +367,7 @@ public class SchedulerController implements SchedulerChannel {
      * @param size The page size
      * @return Return the job definition page
      */
-    public JobRequestResult<JobDefinition> getJobsPage(int page, int size){
+    public JobRequestResult getJobsPage(int page, int size){
         return this.definitions.getPageByCode(page, size);
     }
     

@@ -102,6 +102,6 @@ public class SchedulerControllerBuilder {
      * @return Returns controller instance
      */
     public SchedulerController build(){
-        return new SchedulerController(this.definitions, this.iterations, this.agents, this.workerPublishers);
+        return new SchedulerController(this.definitions, this.iterations, this.agents, this.workerPublishers).initialize();
     }
 }
