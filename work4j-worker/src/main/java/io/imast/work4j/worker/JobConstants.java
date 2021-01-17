@@ -58,6 +58,11 @@ public class JobConstants {
     public static final String PAYLOAD_JOB_CLUSTER = "_PLD_JOB_CLUSTER";
     
     /**
+     * The job execution key
+     */
+    public static final String PAYLOAD_JOB_EXECUTION = "_PLD_JOB_EXECUTION";
+    
+    /**
      * The job created key
      */
     public static final String PAYLOAD_JOB_CREATED = "_PLD_JOB_CREATED";

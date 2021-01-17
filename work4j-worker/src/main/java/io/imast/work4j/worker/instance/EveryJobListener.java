@@ -2,8 +2,10 @@ package io.imast.work4j.worker.instance;
 
 import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.model.JobExecutionOptions;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.JobIteration;
+import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.job.JobOps;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobExecutionContext;
@@ -69,22 +71,24 @@ public class EveryJobListener implements JobListener {
     @Override
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 
-        // get the job definition
-        var definition = JobOps.getJobDefinition(context);
-        
-        // check if definition is null
-        if(definition == null){
-            return;
-        }
         
         // the job id
-        var jobId = definition.getId();
+        var jobId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_ID);
+        
+        // get the code
+        var code = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_CODE);
+        
+        // get the group
+        var group = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_GROUP);
         
         // the job status
         var status = jobException == null ? IterationStatus.SUCCESS : IterationStatus.FAILURE;
         
+        // get execution options
+        var execution = JobOps.<JobExecutionOptions>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXECUTION);
+        
         // if silent reporting 
-        var silent = definition.getExecution() != null && definition.getExecution().isSilentIterations();
+        var silent = execution != null && execution.isSilentIterations();
         
         // if silent reporting is enabled will just silently skip iteration report
         if(silent){
@@ -108,7 +112,7 @@ public class EveryJobListener implements JobListener {
         var result = this.schedulerChannel.iterate(iteration);
         
         if(!result.isPresent()){
-            log.warn(String.format("EveryJobListener: Could not register %s iteration for job %s (%s)", iteration.getStatus(), definition.getCode(), definition.getGroup()));
+            log.warn(String.format("EveryJobListener: Could not register %s iteration for job %s (%s)", iteration.getStatus(), code, group));
         }
     }    
 }

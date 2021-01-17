@@ -108,6 +108,7 @@ public class WorkerFactory {
         systemData.put(JobConstants.PAYLOAD_JOB_TENANT, definition.getTenant());
         systemData.put(JobConstants.PAYLOAD_JOB_STATUS, definition.getStatus());
         systemData.put(JobConstants.PAYLOAD_JOB_CLUSTER, definition.getCluster());
+        systemData.put(JobConstants.PAYLOAD_JOB_EXECUTION, definition.getExecution());
         systemData.put(JobConstants.PAYLOAD_JOB_CREATED, definition.getCreated());
         systemData.put(JobConstants.PAYLOAD_JOB_MODIFIED, definition.getModified());
         
