@@ -380,7 +380,7 @@ public class SchedulerController implements SchedulerChannel {
      * @param size The page size
      * @return Returns a page of iterations with given filter
      */
-    public JobIterationsResult<JobIteration> getIterations(String jobId, IterationStatus status, int page, int size){
+    public JobIterationsResult getIterations(String jobId, IterationStatus status, int page, int size){
         return this.iterations.getPageByTimestamp(jobId, status == null ? null : Arrays.asList(status), page, size);
     }
     

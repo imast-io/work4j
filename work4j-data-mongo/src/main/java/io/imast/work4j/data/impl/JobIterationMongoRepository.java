@@ -18,6 +18,8 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import org.bson.BsonDocument;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.ClassModel;
 import org.bson.conversions.Bson;
@@ -79,7 +81,7 @@ public class JobIterationMongoRepository extends BaseMongoRepository<String, Job
      * @return Returns a page of iterations with given filter
      */
     @Override
-    public JobIterationsResult<JobIteration> getPageByTimestamp(String jobId, List<IterationStatus> statuses, int page, int size) {
+    public JobIterationsResult getPageByTimestamp(String jobId, List<IterationStatus> statuses, int page, int size) {
         var filters = new ArrayList<Bson>();
         
         // add jobId filter if given
@@ -89,16 +91,19 @@ public class JobIterationMongoRepository extends BaseMongoRepository<String, Job
         
         // add target statuses filter if any
         if(Coll.hasItems(statuses)){
-            filters.add(in("status", statuses));
+            filters.add(in("status", statuses.stream().map(s -> s.name()).collect(Collectors.toList())));
         }
         
+        // build final filter
+        var finalFilter = filters.isEmpty() ? new BsonDocument() : and(filters);
+        
         // the query to execute
-        var query = this.getCollection().find(and(filters)).skip(page * size).limit(size);
+        var query = this.getCollection().find(finalFilter).skip(page * size).limit(size);
         
         // the query to see total number
-        var total = this.getCollection().countDocuments(and(filters));
+        var total = this.getCollection().countDocuments(finalFilter);
         
-        return new JobIterationsResult<>(this.toList(query), total);
+        return new JobIterationsResult(this.toList(query), total);
     }
 
     /**

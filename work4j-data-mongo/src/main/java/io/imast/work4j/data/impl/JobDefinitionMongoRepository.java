@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import org.bson.conversions.Bson;
 import java.util.stream.Collectors;
+import org.bson.BsonDocument;
 import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.ClassModel;
 
@@ -61,12 +62,12 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
      * @return Returns a page of job definitions
      */
     @Override
-    public JobRequestResult<JobDefinition> getPageByCode(int page, int size){
+    public JobRequestResult getPageByCode(int page, int size){
         
         // paged result
         var part = this.getCollection().find().sort(descending("code")).skip(page * size).limit(size);   
         
-        return new JobRequestResult<>(this.toList(part), this.getCollection().countDocuments());
+        return new JobRequestResult(this.toList(part), this.getCollection().countDocuments());
     }
             
     /**
@@ -116,7 +117,7 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
             filters.add(in("status", statuses.stream().map(s -> s.toString()).collect(Collectors.toList())));
         }
         
-        return this.toList(this.getCollection().find(and(filters)));
+        return this.toList(this.getCollection().find(filters.isEmpty() ? new BsonDocument() : and(filters)));
     }
     
     /**
@@ -152,7 +153,7 @@ public class JobDefinitionMongoRepository extends BaseMongoRepository<String, Jo
             filters.add(not(in("status", statuses.stream().map(s -> s.toString()).collect(Collectors.toList()))));
         }
         
-        return this.toList(this.getCollection().find(and(filters)));
+        return this.toList(this.getCollection().find(filters.isEmpty() ? new BsonDocument() : and(filters)));
     }
     
     /**

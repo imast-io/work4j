@@ -1,6 +1,7 @@
 package io.imast.work4j.model.iterate;
 
 import java.time.ZonedDateTime;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,7 +41,7 @@ public class JobIteration {
     /**
      * The iteration payload
      */
-    private Object payload;
+    private Map<String, Object> payload;
     
     /**
      * The run time of iteration
