@@ -29,8 +29,8 @@
         
         <dependency>
             <groupId>io.imast</groupId>
-            <artifactId>mongo-sync-core</artifactId>
-            <version>0.0.9</version>
+            <artifactId>mongo-repository</artifactId>
+            <version>0.0.1.PREVIEW</version>
         </dependency>    
         
         <dependency>

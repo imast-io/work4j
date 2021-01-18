@@ -10,18 +10,17 @@ import lombok.NoArgsConstructor;
  * The job iterations page
  * 
  * @author davitp
- * @param <T> The type of job iteration
  */
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class JobIterationsResult <T extends JobIteration> {
+public class JobIterationsResult {
     
     /**
      * The job iterations
      */
-    private List<T> results;
+    private List<JobIteration> results;
     
     /**
      * The total number of items

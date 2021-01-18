@@ -46,7 +46,7 @@ public interface JobIterationRepository {
      * @param size The page size
      * @return Returns a page of iterations with given filter
      */
-    public JobIterationsResult<JobIteration> getPageByTimestamp(String jobId, List<IterationStatus> statuses, int page, int size);
+    public JobIterationsResult getPageByTimestamp(String jobId, List<IterationStatus> statuses, int page, int size);
     
     /**
      * Updates (or inserts) a job iteration into the data store
