@@ -2,10 +2,14 @@ package io.imast.work4j.worker.job;
 
 import io.imast.core.Lang;
 import io.imast.core.Str;
+import io.imast.work4j.execution.JobExecutor;
+import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.worker.JobConstants;
+import io.imast.work4j.worker.WorkerFactory;
 import io.vavr.control.Try;
 import java.util.Map;
+import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobDataMap;
 import org.quartz.JobExecutionContext;
@@ -117,6 +121,44 @@ public class JobOps {
         }
         
         return module;
+    }
+    
+    /**
+     * Get the executor supplier with the given type
+     * 
+     * @param type The job type
+     * @param executionContext The execution context
+     * @return Returns the executor supplier from context if given
+     */
+    public static Function<JobExecutorContext, JobExecutor> getExecutor(String type, JobExecutionContext executionContext){
+        
+        // check key
+        if(Str.blank(type)){
+            log.error("JobOps: Invalid type. Cannot resolve supplier.");
+            return null;
+        }
+        
+        // the scheduler context
+        var context = Try.of(() -> executionContext.getScheduler().getContext()).getOrElse(() -> null);
+        
+        // check if context is not valid
+        if(context == null){
+            log.error("JobOps: No valid scheduler context.");
+            return null;
+        }
+        
+        // get the worker factory
+        var factory = (WorkerFactory) context.get(JobConstants.WORKER_FACTORY);
+        
+        // the supplier
+        var supplier = factory.getExecutor(type);
+        
+        // no supplier by type
+        if(supplier == null){
+            log.error("JobOps: No supplier for type: " + type);
+        }
+        
+        return supplier;
     }
     
     /**

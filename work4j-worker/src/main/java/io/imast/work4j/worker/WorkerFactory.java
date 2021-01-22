@@ -3,8 +3,11 @@ package io.imast.work4j.worker;
 import io.imast.work4j.worker.job.JobOps;
 import io.imast.core.Str;
 import io.imast.core.Zdt;
+import io.imast.work4j.execution.JobExecutor;
+import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.TriggerDefinition;
+import io.imast.work4j.worker.job.QuartzExecutorJob;
 import io.vavr.control.Try;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -12,6 +15,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.TimeZone;
+import java.util.function.Function;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.CronExpression;
 import org.quartz.CronScheduleBuilder;
@@ -33,7 +37,7 @@ public class WorkerFactory {
     /**
      * The map of job classes 
      */
-    protected final Map<String, Class> jobClasses;
+    protected final Map<String, Function<JobExecutorContext, JobExecutor>> jobClasses;
     
     /**
      * Creates new instance of job factory
@@ -55,10 +59,20 @@ public class WorkerFactory {
      * Register a class mapping for the given job type
      * 
      * @param type The job type
-     * @param clazz The class type
+     * @param executorSupplier The executor supplier
      */
-    public void registerJobClass(String type, Class clazz){
-        this.jobClasses.put(type, clazz);
+    public void registerExecutor(String type, Function<JobExecutorContext, JobExecutor> executorSupplier){
+        this.jobClasses.put(type, executorSupplier);
+    }
+    
+    /**
+     * Gets the executor for the given job type
+     * 
+     * @param type The job type
+     * @return Returns executor supplier or null
+     */
+    public Function<JobExecutorContext, JobExecutor> getExecutor(String type){
+        return this.jobClasses.getOrDefault(type, null);
     }
     
     /**
@@ -70,17 +84,8 @@ public class WorkerFactory {
      */
     public JobDetail createJob(JobKey key, JobDefinition jobDefinition){
         
-        // try resolve class 
-        var jobClass = this.getJobClass(jobDefinition.getType());
-
-        // check if available
-        if(jobClass == null){
-            log.error("WorkerFactory: Unknown job class type for the job type: " + jobDefinition.getType());
-            return null;
-        }
-        
         // instantiate a job to schedule 
-        var job = JobBuilder.newJob(jobClass)
+        var job = JobBuilder.newJob(QuartzExecutorJob.class)
                 .withIdentity(key)
                 .storeDurably(false)
                 .build();
@@ -330,15 +335,5 @@ public class WorkerFactory {
         });
         
         return result;
-    }
-    
-    /**
-     * Gets the job class type
-     * 
-     * @param type The type of job
-     * @return Returns class for job
-     */
-    protected Class getJobClass(String type){
-        return this.jobClasses.getOrDefault(type, null);
     }
 }

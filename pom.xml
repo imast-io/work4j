@@ -8,7 +8,7 @@
     <name>${project.groupId}:${project.artifactId}</name>
     <packaging>pom</packaging>
     
-    <description>Work4j: A quartz-based, scalable scheduler with remote/local controllers.</description>    
+    <description>Work4j: service-oriented, scalable, and high-availability scheduling subsystem</description>    
 	
     <url>https://github.com/imast-io/work4j</url>
 	
@@ -34,11 +34,12 @@
         <module>work4j-data</module>
         <module>work4j-data-mongo</module>
         <module>work4j-controller</module>
+        <module>work4j-execution</module>
         <module>work4j-worker</module>
     </modules>
 	
     <properties>
-        <revision>0.0.1.PREVIEW</revision>
+        <revision>0.0.1.RC1</revision>
 		
         <java.version>11</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

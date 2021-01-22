@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Properties;
 import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.execution.JobExecutor;
+import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.worker.ClusteringType;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.WorkerConfiguration;
@@ -22,6 +24,7 @@ import org.quartz.JobListener;
 import org.quartz.SchedulerListener;
 import org.quartz.TriggerListener;
 import java.util.Map;
+import java.util.function.Function;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
@@ -125,11 +128,11 @@ public class WorkerControllerBuilder {
      * Adds a job type and class association
      * 
      * @param type The job type code
-     * @param clazz The job class instance
+     * @param executorSupplier The job class instance
      * @return Returns builder for chaining
      */
-    public WorkerControllerBuilder withJob(String type, Class clazz){
-        this.factory.registerJobClass(type, clazz);
+    public WorkerControllerBuilder withJobExecutor(String type, Function<JobExecutorContext, JobExecutor> executorSupplier){
+        this.factory.registerExecutor(type, executorSupplier);
         return this;
     }
     
@@ -143,39 +146,6 @@ public class WorkerControllerBuilder {
      */
     public WorkerControllerBuilder withModule(String type, String key, Object module){
         this.registerModule(type, key, module);
-        return this;
-    }
-    
-    /**
-     * Use the given listener
-     * 
-     * @param listener The listener to attach
-     * @return Returns builder for chaining
-     */
-    public WorkerControllerBuilder withListener(SchedulerListener listener){
-        this.schedulerListeners.add(listener);
-        return this;
-    }
-    
-    /**
-     * Use the given listener
-     * 
-     * @param listener The listener to attach
-     * @return Returns builder for chaining
-     */
-    public WorkerControllerBuilder withListener(JobListener listener){
-        this.jobListeners.add(listener);
-        return this;
-    }
-    
-    /**
-     * Use the given listener
-     * 
-     * @param listener The listener to attach
-     * @return Returns builder for chaining
-     */
-    public WorkerControllerBuilder withListener(TriggerListener listener){
-        this.triggerListeners.add(listener);
         return this;
     }
     
