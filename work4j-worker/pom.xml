@@ -48,6 +48,12 @@
          
         <dependency>
             <groupId>io.imast</groupId>
+            <artifactId>work4j-execution</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        
+        <dependency>
+            <groupId>io.imast</groupId>
             <artifactId>work4j-channel</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -81,14 +81,4 @@ public class JobConstants {
      * The job factory
      */
     public static final String WORKER_FACTORY = "WORKER_FACTORY";
-    
-    /**
-     * The unknown job type constant
-     */
-    public static final String UNKNOWN_JOB_TYPE = "__UNKNOWN_JOB";
-    
-    /**
-     * The dry run job type constant
-     */
-    public static final String DRY_RUN_JOB_TYPE = "__DRY_RUN_JOB";
 }

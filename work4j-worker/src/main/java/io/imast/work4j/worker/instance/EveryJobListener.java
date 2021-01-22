@@ -1,5 +1,6 @@
 package io.imast.work4j.worker.instance;
 
+import io.imast.core.Lang;
 import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.JobExecutionOptions;
@@ -90,6 +91,9 @@ public class EveryJobListener implements JobListener {
         // if silent reporting 
         var silent = execution != null && execution.isSilentIterations();
         
+        // get result if any
+        var output = context.getResult();
+        
         // if silent reporting is enabled will just silently skip iteration report
         if(silent){
             return;
@@ -104,6 +108,7 @@ public class EveryJobListener implements JobListener {
                 .jobId(jobId)
                 .runtime(runtime)
                 .status(status)
+                .payload(Lang.safeCast(output))
                 .message(jobException == null ? null : jobException.toString())
                 .timestamp(Zdt.utc())
                 .build();
