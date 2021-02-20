@@ -1,11 +1,9 @@
 package io.imast.work4j.model.iterate;
 
-import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.Map;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
  * The job iteration data structure
@@ -13,13 +11,11 @@ import lombok.NoArgsConstructor;
  * @author davitp
  */
 @Data
-@Builder
-@AllArgsConstructor
-@NoArgsConstructor
-public class JobIteration {
+@Builder(toBuilder = true)
+public class Iteration {
     
     /**
-     * The entry id
+     * The iteration identifier
      */
     private String id;
     
@@ -29,17 +25,22 @@ public class JobIteration {
     private String jobId;
     
     /**
-     * The job iteration status
+     * The session the iteration was executed in
+     */
+    private String session;
+    
+    /**
+     * The status of performed iteration 
      */
     private IterationStatus status;
     
     /**
-     * The message
+     * The message of iteration if available
      */
     private String message;
     
     /**
-     * The iteration payload
+     * The iteration payload if available
      */
     private Map<String, Object> payload;
     
@@ -49,7 +50,7 @@ public class JobIteration {
     private Long runtime;
     
     /**
-     * The timestamp
+     * The timestamp of the iteration
      */
-    private ZonedDateTime timestamp;
+    private Date timestamp;
 }

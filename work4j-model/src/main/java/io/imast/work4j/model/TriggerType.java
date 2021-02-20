@@ -1,24 +1,24 @@
 package io.imast.work4j.model;
 
 /**
- * The schedule type
+ * The trigger type indicates how job should be executed
  * 
  * @author davitp
  */
 public enum TriggerType {
     
     /**
-     * The static period schedule
+     * The trigger type indicates repeating job at fixed period
      */
-    STATIC_PERIOD,
+    PERIODIC,
     
     /**
-     * The Cron type of schedule
+     * The trigger type indicates schedule of job based on Cron expression
      */
     CRON,
     
     /**
-     * One-time execution job
+     * The trigger type indicates scheduling job to run once
      */
-    ONE_TIME    
+    ONCE    
 }

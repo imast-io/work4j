@@ -1,4 +1,4 @@
-package io.imast.work4j.model;
+package io.imast.work4j.model.instance;
 
 import java.io.Serializable;
 
@@ -10,24 +10,9 @@ import java.io.Serializable;
 public enum JobStatus implements Serializable {
     
     /**
-     * The Job is defined but not submitted for execution
-     */
-    DEFINED, 
-    
-    /**
      * Job is created and definition is stored to database
      */
     ACTIVE,
-    
-    /**
-     * The execution is paused 
-     */
-    PAUSED,
-    
-    /**
-     * The job is assigned and agent failed to execute job
-     */
-    FAILED,
     
     /**
      * Job is completed and has no more things to do
