@@ -20,9 +20,9 @@ public class Iteration {
     private String id;
     
     /**
-     * The job id
+     * The instance identifier
      */
-    private String jobId;
+    private String instanceId;
     
     /**
      * The session the iteration was executed in

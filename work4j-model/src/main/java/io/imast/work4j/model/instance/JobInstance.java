@@ -31,12 +31,17 @@ public class JobInstance {
     /**
      * The status of execution
      */
-    private JobStatus jobStatus;
+    private JobStatus status;
     
     /**
      * The completion severity
      */
     private CompletionSeverity completionSeverity;
+    
+    /**
+     * The cluster override value 
+     */
+    private String cluster;
     
     /**
      * The execution instance was created

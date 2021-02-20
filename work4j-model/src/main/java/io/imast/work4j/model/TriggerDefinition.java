@@ -1,7 +1,7 @@
 package io.imast.work4j.model;
 
 import java.io.Serializable;
-import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * The trigger definition instance
+ * The trigger definition structure
  * 
  * @author davitp
  */
@@ -37,17 +37,17 @@ public class TriggerDefinition implements Serializable {
     /**
      * The static period to use in milliseconds
      */
-    private Double period;
+    private Long period;
     
     /**
      * The start time for trigger
      */
-    private ZonedDateTime startAt;
+    private Date startAt;
     
     /**
      * The end time for trigger
      */
-    private ZonedDateTime endAt;
+    private Date endAt;
     
     /**
      * The trigger data payload

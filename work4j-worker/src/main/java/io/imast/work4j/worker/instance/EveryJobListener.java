@@ -4,10 +4,11 @@ import io.imast.core.Lang;
 import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.JobExecutionOptions;
+import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationStatus;
-import io.imast.work4j.model.iterate.JobIteration;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.job.JobOps;
+import java.util.Date;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
@@ -72,15 +73,14 @@ public class EveryJobListener implements JobListener {
     @Override
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 
-        
         // the job id
-        var jobId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_ID);
+        var instanceId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_ID);
         
-        // get the code
-        var code = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_CODE);
+        // get the name
+        var name = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_NAME);
         
-        // get the group
-        var group = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_GROUP);
+        // get the folder
+        var folder = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_FOLDER);
         
         // the job status
         var status = jobException == null ? IterationStatus.SUCCESS : IterationStatus.FAILURE;
@@ -103,21 +103,21 @@ public class EveryJobListener implements JobListener {
         var runtime = context.getJobRunTime();
         
         // create iteration entity
-        var iteration = JobIteration.builder()
+        var iteration = Iteration.builder()
                 .id(null)
-                .jobId(jobId)
+                .instanceId(instanceId)
                 .runtime(runtime)
                 .status(status)
                 .payload(Lang.safeCast(output))
                 .message(jobException == null ? null : jobException.toString())
-                .timestamp(Zdt.utc())
+                .timestamp(new Date())
                 .build();
         
         // register iteration and get the result
         var result = this.schedulerChannel.iterate(iteration);
         
         if(!result.isPresent()){
-            log.warn(String.format("EveryJobListener: Could not register %s iteration for job %s (%s)", iteration.getStatus(), code, group));
+            log.warn(String.format("EveryJobListener: Could not register %s iteration for job %s (%s)", iteration.getStatus(), name, folder));
         }
     }    
 }
