@@ -20,7 +20,7 @@ public class JobIterationsResult {
     /**
      * The job iterations
      */
-    private List<JobIteration> results;
+    private List<Iteration> results;
     
     /**
      * The total number of items

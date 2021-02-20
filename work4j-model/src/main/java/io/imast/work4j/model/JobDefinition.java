@@ -1,7 +1,7 @@
 package io.imast.work4j.model;
 
 import java.io.Serializable;
-import java.time.ZonedDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import lombok.AllArgsConstructor;
@@ -21,39 +21,34 @@ import lombok.NoArgsConstructor;
 public class JobDefinition implements Serializable {
     
     /**
-     * The entry ID
+     * The job definition identifier
      */
     private String id;
     
     /**
-     * The job code
+     * The job definition name
      */
-    private String code;
+    private String name;
     
     /**
-     * The job group
+     * The job definition folder
      */
-    private String group;
+    private String folder;
     
     /**
-     * The job type
+     * The job definition type
      */
     private String type;
     
     /**
-     * The job tenant
-     */
-    private String tenant;
-    
-    /**
-     * The Cron schedule of request
+     * The set of trigger definitions
      */
     private List<TriggerDefinition> triggers;
-    
+       
     /**
-     * The status of job
+     * The job definition tenant
      */
-    private JobStatus status;
+    private String tenant;
     
     /**
      * The cluster for the job
@@ -88,12 +83,12 @@ public class JobDefinition implements Serializable {
     /**
      * Timestamp of creation
      */
-    private ZonedDateTime created;
+    private Date created;
     
     /**
      * The time of last modification
      */
-    private ZonedDateTime modified;
+    private Date modified;
     
     /**
      * The extra information required for execution
