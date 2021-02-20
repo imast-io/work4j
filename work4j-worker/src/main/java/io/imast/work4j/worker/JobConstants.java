@@ -28,14 +28,19 @@ public class JobConstants {
     public static final String PAYLOAD_JOB_ID = "_PLD_JOB_ID";
     
     /**
-     * The job code key
+     * The job instance id key
      */
-    public static final String PAYLOAD_JOB_CODE = "_PLD_JOB_CODE";
+    public static final String PAYLOAD_JOB_INSTANCE_ID = "_PLD_JOB_INSTANCE_ID";
     
     /**
-     * The job group key
+     * The job name key
      */
-    public static final String PAYLOAD_JOB_GROUP = "_PLD_JOB_GROUP";
+    public static final String PAYLOAD_JOB_NAME = "_PLD_JOB_NAME";
+    
+    /**
+     * The job folder key
+     */
+    public static final String PAYLOAD_JOB_FOLDER = "_PLD_JOB_FOLDER";
     
     /**
      * The job type key

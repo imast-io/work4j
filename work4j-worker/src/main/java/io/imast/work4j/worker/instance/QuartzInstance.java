@@ -202,7 +202,7 @@ public class QuartzInstance {
     protected void scheduleImpl(JobDefinition jobDefinition){
         
         // the job key
-        var key = JobKey.jobKey(jobDefinition.getCode(), jobDefinition.getGroup());
+        var key = JobKey.jobKey(jobDefinition.getName(), jobDefinition.getFolder());
         
         try {
             // check if job exists
@@ -247,7 +247,7 @@ public class QuartzInstance {
     protected void rescheduleImpl(JobDefinition jobDefinition){
         
         // the job key
-        var key = JobKey.jobKey(jobDefinition.getCode(), jobDefinition.getGroup());
+        var key = JobKey.jobKey(jobDefinition.getName(), jobDefinition.getFolder());
         
         try {
             // check if job exists
@@ -280,7 +280,7 @@ public class QuartzInstance {
             // add job to scheduler;
             this.scheduler.scheduleJob(jobDetail, triggers, true);
             
-            log.info(String.format("QuartzInstance: Job (%s in %s) is rescheduled", jobDefinition.getCode(), jobDefinition.getGroup()));
+            log.info(String.format("QuartzInstance: Job (%s in %s) is rescheduled", jobDefinition.getName(), jobDefinition.getFolder()));
         }
         catch(SchedulerException error){
             log.error("QuartzInstance: Failed to schedule the job", error);

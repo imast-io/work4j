@@ -2,7 +2,6 @@ package io.imast.work4j.worker;
 
 import io.imast.work4j.worker.job.JobOps;
 import io.imast.core.Str;
-import io.imast.core.Zdt;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.model.JobDefinition;
@@ -107,8 +106,8 @@ public class WorkerFactory {
         
         // populte system data
         systemData.put(JobConstants.PAYLOAD_JOB_ID, definition.getId());
-        systemData.put(JobConstants.PAYLOAD_JOB_CODE, definition.getCode());
-        systemData.put(JobConstants.PAYLOAD_JOB_GROUP, definition.getGroup());
+        systemData.put(JobConstants.PAYLOAD_JOB_NAME, definition.getName());
+        systemData.put(JobConstants.PAYLOAD_JOB_FOLDER, definition.getFolder());
         systemData.put(JobConstants.PAYLOAD_JOB_TYPE, definition.getType());
         systemData.put(JobConstants.PAYLOAD_JOB_TENANT, definition.getTenant());
         systemData.put(JobConstants.PAYLOAD_JOB_STATUS, definition.getStatus());
@@ -198,12 +197,12 @@ public class WorkerFactory {
 
         // if start time is given
         if(trigger.getStartAt() != null){
-            triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
+            triggerBuilder.startAt(trigger.getStartAt());
         }
         
         // if end time is given
         if(trigger.getEndAt() != null){
-            triggerBuilder.endAt(Zdt.toDate(trigger.getEndAt()));
+            triggerBuilder.endAt(trigger.getEndAt());
         }
 
         // schedule job with cron trigger
@@ -242,12 +241,12 @@ public class WorkerFactory {
         
         // if start time is given
         if(trigger.getStartAt() != null){
-            triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
+            triggerBuilder.startAt(trigger.getStartAt());
         }
         
         // if end time is given
         if(trigger.getEndAt() != null){
-            triggerBuilder.endAt(Zdt.toDate(trigger.getEndAt()));
+            triggerBuilder.endAt(trigger.getEndAt());
         }
         
         // add trigger
@@ -273,7 +272,7 @@ public class WorkerFactory {
         
          // if start time is given
         if(trigger.getStartAt()!= null){
-            triggerBuilder.startAt(Zdt.toDate(trigger.getStartAt()));
+            triggerBuilder.startAt(trigger.getStartAt());
         } else {
             triggerBuilder.startNow();
         }
@@ -317,10 +316,10 @@ public class WorkerFactory {
                 case CRON:
                     quartzTriggers = this.cronTrigger(jobDefinition, trigger);
                     break;
-                case STATIC_PERIOD:
+                case PERIODIC:
                     quartzTriggers = this.periodTrigger(jobDefinition, trigger);
                     break;
-                case ONE_TIME:
+                case ONCE:
                     quartzTriggers = this.createOneTimeTriggers(jobDefinition, trigger);
                     break;
             }

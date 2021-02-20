@@ -43,7 +43,7 @@ public class QuartzExecutorContext implements JobExecutorContext {
      */
     @Override
     public String getGroup(){        
-        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_GROUP);
+        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_FOLDER);
     }
     
     /**

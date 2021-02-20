@@ -29,6 +29,11 @@ public class WorkerSession {
     private String worker;
     
     /**
+     * The tenant identifier
+     */
+    private String tenant;
+    
+    /**
      * The maximum idle time to consider worker session as active
      */
     private Long maxIdle;
