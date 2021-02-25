@@ -17,16 +17,6 @@ import lombok.NoArgsConstructor;
 public class JobStatusExchangeRequest {
     
     /**
-     * The job group for status exchange
-     */
-    private String group;
-    
-    /**
-     * The target type to lookup
-     */
-    private String type;
-    
-    /**
      * The cluster
      */
     private String cluster;

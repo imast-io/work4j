@@ -20,9 +20,14 @@ public class Iteration {
     private String id;
     
     /**
-     * The instance identifier
+     * The job identifier
      */
-    private String instanceId;
+    private String jobId;
+    
+    /**
+     * The execution instance identifier
+     */
+    private String executionId;
     
     /**
      * The session the iteration was executed in
