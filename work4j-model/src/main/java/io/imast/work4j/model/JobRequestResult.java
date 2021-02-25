@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
  * The result of job query
  * 
  * @author davitp
- * @param <T> The type of job definition
  */
 @Data
 @AllArgsConstructor

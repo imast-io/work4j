@@ -1,4 +1,4 @@
-package io.imast.work4j.model.instance;
+package io.imast.work4j.model.execution;
 
 import java.io.Serializable;
 
@@ -7,7 +7,7 @@ import java.io.Serializable;
  * 
  * @author davitp
  */
-public enum CompletionSeverity implements Serializable{
+public enum CompletionSeverity implements Serializable {
     
     /**
      * The indication of successful completion
@@ -18,6 +18,11 @@ public enum CompletionSeverity implements Serializable{
      * The indication of successful completion with warnings
      */
     WARNING,
+    
+    /**
+     * The completion is not complete (for example, due to cancellation)
+     */
+    INCOMPLETE,
     
     /**
      * The indication of unsuccessful completion
