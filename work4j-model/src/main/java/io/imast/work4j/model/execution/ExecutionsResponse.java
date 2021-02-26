@@ -16,5 +16,10 @@ public class ExecutionsResponse {
     /**
      * The set of execution identifiers to get
      */
-    private List<String> executions;
+    private List<JobExecution> executions;
+    
+    /**
+     * The total number of entries for query
+     */
+    private long total;
 }

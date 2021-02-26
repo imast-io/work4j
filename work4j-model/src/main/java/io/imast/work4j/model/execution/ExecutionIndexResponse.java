@@ -1,16 +1,17 @@
 package io.imast.work4j.model.execution;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
 /**
- * The execution status request 
+ * The execution index response
  * 
  * @author davitp
  */
 @Data
 @Builder(toBuilder = true)
-public class ExecutionStatusRequest {
+public class ExecutionIndexResponse {
     
     /**
      * The target cluster
@@ -21,4 +22,9 @@ public class ExecutionStatusRequest {
      * The target tenant
      */
     private String tenant;    
+    
+    /**
+     * The set of execution index entries
+     */
+    private List<ExecutionIndexEntry> entries;
 }

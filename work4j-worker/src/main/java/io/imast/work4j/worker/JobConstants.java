@@ -25,7 +25,7 @@ public class JobConstants {
     /**
      * The job id key
      */
-    public static final String PAYLOAD_JOB_ID = "_PLD_JOB_ID";
+    public static final String PAYLOAD_JOB_EXEC_ID = "_PLD_JOB_EXEC_ID";
     
     /**
      * The job instance id key

@@ -1,6 +1,6 @@
 package io.imast.work4j.model.execution;
 
-import io.imast.work4j.model.JobExecutionOptions;
+import io.imast.work4j.model.JobOptions;
 import io.imast.work4j.model.TriggerDefinition;
 import java.util.Date;
 import java.util.List;
@@ -70,13 +70,8 @@ public class JobExecution {
     /**
      * The execution options
      */
-    private JobExecutionOptions execution;
-    
-    /**
-     * The set of selectors
-     */
-    private Map<String, String> selectors;
-    
+    private JobOptions options;
+        
     /**
      * The job data payload
      */
