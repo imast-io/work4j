@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class JobExecutionOptions implements Serializable {
+public class JobOptions implements Serializable {
     
     /**
      * The option controls reporting iteration results to controller.

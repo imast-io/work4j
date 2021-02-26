@@ -5,13 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * The execution status request 
+ * The execution index request 
  * 
  * @author davitp
  */
 @Data
 @Builder(toBuilder = true)
-public class ExecutionStatusResponse {
+public class ExecutionIndexRequest {
     
     /**
      * The target cluster
@@ -21,10 +21,10 @@ public class ExecutionStatusResponse {
     /**
      * The target tenant
      */
-    private String tenant;    
+    private String tenant;   
     
     /**
-     * The map of executions and their ids
+     * The specific executions to request
      */
-    private List<ExecutionStatusResponseEntry> executions;
+    private List<String> executions;
 }

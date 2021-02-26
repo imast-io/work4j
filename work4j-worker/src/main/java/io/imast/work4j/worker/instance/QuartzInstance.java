@@ -118,7 +118,6 @@ public class QuartzInstance {
         if(jobDefinition == null){
             return;
         }
-        
         synchronized(this.scheduler){
             this.rescheduleImpl(jobDefinition);
         }

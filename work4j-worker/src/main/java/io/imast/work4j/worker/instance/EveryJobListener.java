@@ -3,7 +3,7 @@ package io.imast.work4j.worker.instance;
 import io.imast.core.Lang;
 import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
-import io.imast.work4j.model.JobExecutionOptions;
+import io.imast.work4j.model.JobOptions;
 import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.worker.JobConstants;
@@ -74,7 +74,7 @@ public class EveryJobListener implements JobListener {
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 
         // the job id
-        var instanceId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_ID);
+        var executionId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_ID);
         
         // get the name
         var name = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_NAME);
@@ -86,10 +86,10 @@ public class EveryJobListener implements JobListener {
         var status = jobException == null ? IterationStatus.SUCCESS : IterationStatus.FAILURE;
         
         // get execution options
-        var execution = JobOps.<JobExecutionOptions>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXECUTION);
+        var options = JobOps.<JobOptions>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXECUTION);
         
         // if silent reporting 
-        var silent = execution != null && execution.isSilentIterations();
+        var silent = options != null && options.isSilentIterations();
         
         // get result if any
         var output = context.getResult();
@@ -105,7 +105,7 @@ public class EveryJobListener implements JobListener {
         // create iteration entity
         var iteration = Iteration.builder()
                 .id(null)
-                .instanceId(instanceId)
+                .executionId(instanceId)
                 .runtime(runtime)
                 .status(status)
                 .payload(Lang.safeCast(output))

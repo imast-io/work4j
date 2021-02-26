@@ -1,30 +1,20 @@
 package io.imast.work4j.model;
 
 import java.io.Serializable;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
- * The Job Definition model
+ * The Job Definition Input Model
  * 
  * @author davitp
  */
 @Data
-@AllArgsConstructor
-@NoArgsConstructor
 @Builder(toBuilder = true)
-public class JobDefinition implements Serializable {
-    
-    /**
-     * The job definition identifier
-     */
-    private String id;
-    
+public class JobDefinitionInput implements Serializable {
+
     /**
      * The job definition name
      */
@@ -69,27 +59,7 @@ public class JobDefinition implements Serializable {
      * The job data payload
      */
     private Map<String, Object> payload;
-    
-    /**
-     * The user that defined the job
-     */
-    private String createdBy;
-    
-    /**
-     * The user that modified the job
-     */
-    private String modifiedBy;
-    
-    /**
-     * Timestamp of creation
-     */
-    private Date created;
-    
-    /**
-     * The time of last modification
-     */
-    private Date modified;
-    
+        
     /**
      * The extra information required for execution
      */
