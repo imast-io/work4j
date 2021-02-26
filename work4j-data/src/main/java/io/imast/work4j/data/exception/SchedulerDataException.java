@@ -46,6 +46,16 @@ public class SchedulerDataException extends Exception {
     }
     
     /**
+     * Creates scheduler data exception
+     * 
+     * @param cause The cause of exception
+     */
+    public SchedulerDataException(Throwable cause){
+        super(cause);
+        this.validation = null;
+    }
+    
+    /**
      * Gets the validation data
      * 
      * @return Returns the validation info
