@@ -1,5 +1,12 @@
-package io.imast.work4j.data;
+package io.imast.work4j.data.impl;
 
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
+import io.imast.core.Str;
+import io.imast.work4j.data.SchedulerRepository;
 import io.imast.work4j.data.exception.SchedulerDataException;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobDefinitionInput;
@@ -13,23 +20,80 @@ import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.JobIterationsResult;
 import io.imast.work4j.model.worker.WorkerSession;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
+import org.bson.BsonDocument;
+import org.bson.conversions.Bson;
 
 /**
- * The scheduler data repository
+ * The mongo repository for the scheduler data
  * 
  * @author davitp
  */
-public interface SchedulerRepository {
+public class SchedulerMongoRepisotory implements SchedulerRepository {
+
+    /**
+     * The table prefix for the source collections
+     */
+    protected static final String COLLECTION_PREFIX = "work4j";
+    
+    /**
+     * The mongo database client
+     */
+    protected final MongoClient client;
+    
+    /**
+     * The mongo database instance
+     */
+    protected final MongoDatabase mongoDatabase;
+    
+    /**
+     * The job definitions collection
+     */
+    protected final MongoCollection<JobDefinition> definitions;
+    
+    /**
+     * The iterations collection
+     */
+    private final MongoCollection<Iteration> iterations;
+    
+    /**
+     * The workers collection
+     */
+    private final MongoCollection<WorkerSession> workers;
+    
+    /**
+     * The executions collection
+     */
+    private final MongoCollection<JobExecution> executions;
+    
+    /**
+     * Creates new instance of scheduler mongo repository
+     * 
+     * @param client The client to mongo
+     * @param mongoDatabase The mongo database reference
+     */
+    public SchedulerMongoRepisotory(MongoClient client, MongoDatabase mongoDatabase){
+        this.client = client;
+        this.mongoDatabase = mongoDatabase;
+        this.definitions = this.mongoDatabase.getCollection(this.collection("definitions"), JobDefinition.class);
+        this.iterations = this.mongoDatabase.getCollection(this.collection("iterations"), Iteration.class);
+        this.workers = this.mongoDatabase.getCollection(this.collection("workers"), WorkerSession.class);
+        this.executions = this.mongoDatabase.getCollection(this.collection("executions"), JobExecution.class);
+
+    }
     
     /**
      * Ensures that schema is ready for data operations
      * 
      * @throws SchedulerDataException 
      */
-    public void ensureSchema() throws SchedulerDataException;
+    @Override
+    public void ensureSchema() throws SchedulerDataException {        
+    }
     
     /**
      * Gets all the job definitions
@@ -40,7 +104,35 @@ public interface SchedulerRepository {
      * @return Returns set of all job definitions
      * @throws SchedulerDataException
      */
-    public List<JobDefinition> getAllJobs(String tenant, String cluster, String type) throws SchedulerDataException;
+    @Override
+    public List<JobDefinition> getAllJobs(String tenant, String cluster, String type) throws SchedulerDataException {
+        
+        // the target filters
+        var filters = new ArrayList<Bson>();
+        
+        // add type filter if given
+        if(!Str.blank(type)){
+            filters.add(eq("type", type));
+        }
+        
+        // add tenant filter if given
+        if(!Str.blank(tenant)){
+            filters.add(eq("tenant", tenant));
+        }
+        
+        // add cluster filter if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("cluster", cluster));
+        }
+        
+        // combined filter
+        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
+
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.definitions.find(session, combined).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets the job definition by identifier
@@ -49,7 +141,13 @@ public interface SchedulerRepository {
      * @return Returns job definition if found
      * @throws SchedulerDataException
      */
-    public Optional<JobDefinition> getJobById(String id) throws SchedulerDataException;
+    @Override
+    public Optional<JobDefinition> getJobById(String id) throws SchedulerDataException {
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return Optional.ofNullable(this.definitions.find(session, eq("_id", id)).first());
+        }));
+        
+    }
     
     /**
      * Get the page of job definitions sorted by code
@@ -371,4 +469,31 @@ public interface SchedulerRepository {
      * @throws SchedulerDataException
      */
     public Optional<WorkerSession> deleteWorkerSessionById(String id) throws SchedulerDataException;
+    
+    /**
+     * Builds the collection name
+     * 
+     * @param name The collection name 
+     * @return Returns collection name with prefix
+     */
+    private String collection(String name){
+        return String.format("%s_%s", COLLECTION_PREFIX, name);
+    } 
+    
+    /**
+     * Handle the exception simply by throwing
+     * 
+     * @param <T> The result type
+     * @param fn The function to apply
+     * @return Returns the function result
+     * @throws SchedulerDataException 
+     */
+    protected <T> T handle(Supplier<T> fn) throws SchedulerDataException {
+        try{
+            return fn.get();
+        }
+        catch(Throwable e){
+            throw new SchedulerDataException(e);
+        }
+    }
 }
