@@ -51,6 +51,16 @@ public class JobDefinitionInput implements Serializable {
     private JobOptions options;
     
     /**
+     * The creator user
+     */
+    private String createdBy;
+    
+    /**
+     * The modified user
+     */
+    private String modifiedBy;
+    
+    /**
      * The set of selectors
      */
     private Map<String, String> selectors;

@@ -5,6 +5,7 @@ import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobDefinitionInput;
 import io.imast.work4j.model.JobRequestResult;
 import io.imast.work4j.model.execution.ExecutionStatus;
+import io.imast.work4j.model.execution.ExecutionUpdateInput;
 import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
 import io.imast.work4j.model.execution.JobExecutionInput;
@@ -227,11 +228,11 @@ public interface SchedulerRepository {
      * Updates the execution status of the given job instance
      * 
      * @param id The execution id
-     * @param status The new execution status
+     * @param input The execution update input
      * @return Returns updated job execution
      * @throws SchedulerDataException 
      */
-    public JobExecution updateExecutionStatus(String id, ExecutionStatus status) throws SchedulerDataException;
+    public JobExecution updateExecution(String id, ExecutionUpdateInput input) throws SchedulerDataException;
     
     /**
      * Gets the job iteration by identifier
