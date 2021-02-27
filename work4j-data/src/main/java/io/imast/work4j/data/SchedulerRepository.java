@@ -12,8 +12,10 @@ import io.imast.work4j.model.execution.JobExecutionInput;
 import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
-import io.imast.work4j.model.iterate.JobIterationsResult;
+import io.imast.work4j.model.iterate.IterationsResponse;
+import io.imast.work4j.model.worker.WorkerActivity;
 import io.imast.work4j.model.worker.WorkerSession;
+import io.imast.work4j.model.worker.WorkerSessionInput;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -254,7 +256,7 @@ public interface SchedulerRepository {
      * @return Returns a page of iterations with given filter
      * @throws SchedulerDataException
      */
-    public JobIterationsResult getIterationsPage(String jobId, String executionId, List<IterationStatus> statuses, int page, int size) throws SchedulerDataException;
+    public IterationsResponse getIterationsPage(String jobId, String executionId, List<IterationStatus> statuses, int page, int size) throws SchedulerDataException;
     
     /**
      * Inserts a job iteration into the data store
@@ -333,16 +335,26 @@ public interface SchedulerRepository {
      * @return Returns agent definition if found
      * @throws SchedulerDataException
      */
-    public Optional<WorkerSession> getWorkerSessionId(String id) throws SchedulerDataException;
+    public Optional<WorkerSession> getWorkerSessionById(String id) throws SchedulerDataException;
     
     /**
      * Inserts a agent definition into the data store
      * 
-     * @param session The session to insert
-     * @return Returns saved agent definition
+     * @param input The session to insert
+     * @return Returns saved worker session
      * @throws SchedulerDataException
      */
-    public WorkerSession upsertWorkerSession(WorkerSession session) throws SchedulerDataException;
+    public WorkerSession insertWorkerSession(WorkerSessionInput input) throws SchedulerDataException;
+    
+    /**
+     * Updates a agent definition in the data store
+     * 
+     * @param id The id of worker session
+     * @param activity The activity to modify
+     * @return Returns saved worker session
+     * @throws SchedulerDataException
+     */
+    public WorkerSession updateWorkerSession(String id, WorkerActivity activity) throws SchedulerDataException;
     
     /**
      * Deletes all the idle sessions for the given cluster and machine

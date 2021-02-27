@@ -8,6 +8,11 @@ package io.imast.work4j.model.worker;
 public enum WorkerActivity {
     
     /**
+     * The worker registration activity
+     */
+    REGISTER,
+    
+    /**
      *
      * Worker heartbeat indicates health of worker
      */
