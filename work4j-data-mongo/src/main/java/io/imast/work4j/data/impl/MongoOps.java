@@ -1,6 +1,5 @@
 package io.imast.work4j.data.impl;
 
-import com.mongodb.MongoCommandException;
 import com.mongodb.ReadConcern;
 import com.mongodb.ReadPreference;
 import com.mongodb.TransactionOptions;

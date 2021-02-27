@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class JobIterationsResult {
+public class IterationsResponse {
     
     /**
      * The job iterations

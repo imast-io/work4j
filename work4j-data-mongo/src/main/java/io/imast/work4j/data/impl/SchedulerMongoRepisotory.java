@@ -6,6 +6,8 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.in;
+import static com.mongodb.client.model.Filters.lt;
 import static com.mongodb.client.model.Sorts.descending;
 import io.imast.core.Str;
 import io.imast.work4j.data.SchedulerRepository;
@@ -22,8 +24,10 @@ import io.imast.work4j.model.execution.JobExecutionInput;
 import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
-import io.imast.work4j.model.iterate.JobIterationsResult;
+import io.imast.work4j.model.iterate.IterationsResponse;
+import io.imast.work4j.model.worker.WorkerActivity;
 import io.imast.work4j.model.worker.WorkerSession;
+import io.imast.work4j.model.worker.WorkerSessionInput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -713,7 +717,23 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns removed job execution if any
      * @throws SchedulerDataException
      */
-    public Optional<JobExecution> deleteExecutionById(String id) throws SchedulerDataException;
+    @Override
+    public Optional<JobExecution> deleteExecutionById(String id) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get existing item by id
+            var existing = this.executions.find(session, this.hasId(id)).first();
+            
+            // delete if exists
+            if(existing != null) {
+                // delete single entity
+                this.executions.deleteOne(session, this.hasId(id));
+            }
+            
+            return Optional.ofNullable(existing);
+        }));
+    }
     
     /**
      * Deletes the executions of the given job id
@@ -722,7 +742,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of deleted executions
      * @throws SchedulerDataException
      */
-    public long deleteExecutionsByJob(String jobId) throws SchedulerDataException;
+    @Override
+    public long deleteExecutionsByJob(String jobId) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.executions.deleteMany(session, eq("jobId", jobId)).getDeletedCount();
+        }));
+    }
     
     /**
      * Deletes all the executions by given status codes
@@ -731,7 +757,25 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of deleted executions
      * @throws SchedulerDataException
      */
-    public long deleteAllExecutionsByStatus(List<ExecutionStatus> statuses) throws SchedulerDataException;
+    @Override
+    public long deleteAllExecutionsByStatus(List<ExecutionStatus> statuses) throws SchedulerDataException {
+        
+        // the deletion filter
+        Bson filter;
+        
+        // no status to filter consider all, otherwise use statuses
+        if(statuses == null || statuses.isEmpty()){
+            filter = new BsonDocument();
+        }
+        else{
+            filter = in("status", statuses.stream().map(s -> s.name()));
+        }
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.executions.deleteMany(session, filter).getDeletedCount();
+        }));
+    }
     
     /**
      * Deletes all the executions
@@ -739,7 +783,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of deleted executions
      * @throws SchedulerDataException
      */
-    public long deleteAllExecutions() throws SchedulerDataException;
+    @Override
+    public long deleteAllExecutions() throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.executions.deleteMany(session, new BsonDocument()).getDeletedCount();
+        }));
+    }
     
     /**
      * Gets all the job iterations 
@@ -747,7 +797,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of all iterations 
      * @throws SchedulerDataException 
      */
-    public List<Iteration> getAllIterations() throws SchedulerDataException;
+    @Override
+    public List<Iteration> getAllIterations() throws SchedulerDataException {
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.find(session, new BsonDocument()).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets all the job iterations for the given job
@@ -756,7 +812,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of all job iterations 
      * @throws SchedulerDataException 
      */
-    public List<Iteration> getJobIterations(String jobId) throws SchedulerDataException;
+    @Override
+    public List<Iteration> getJobIterations(String jobId) throws SchedulerDataException {
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.find(session, eq("jobId", jobId)).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets all the iterations for the given execution
@@ -765,7 +827,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of all job iterations for execution
      * @throws SchedulerDataException
      */
-    public List<Iteration> getExecutionIterations(String executionId) throws SchedulerDataException;
+    @Override
+    public List<Iteration> getExecutionIterations(String executionId) throws SchedulerDataException {
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.find(session, eq("executionId", executionId)).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets the job iteration by identifier
@@ -774,7 +842,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns job iteration if found
      * @throws SchedulerDataException
      */
-    public Optional<Iteration> getIterationById(String id) throws SchedulerDataException;
+    @Override
+    public Optional<Iteration> getIterationById(String id) throws SchedulerDataException {
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return Optional.ofNullable(this.iterations.find(session, this.hasId(id)).first());
+        }));
+    }
     
     /**
      * Gets the page of iterations ordered by timestamp (optionally filter by job id and statuses)
@@ -787,16 +860,125 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns a page of iterations with given filter
      * @throws SchedulerDataException
      */
-    public JobIterationsResult getIterationsPage(String jobId, String executionId, List<IterationStatus> statuses, int page, int size) throws SchedulerDataException;
+    @Override
+    public IterationsResponse getIterationsPage(String jobId, String executionId, List<IterationStatus> statuses, int page, int size) throws SchedulerDataException {
+        
+        // set of filters
+        var filters = new ArrayList<Bson>();
+        
+        // filter by job id
+        if(!Str.blank(jobId)){
+            filters.add(eq("jobId", jobId));
+        }
+        
+        // filter by execution id
+        if(!Str.blank(executionId)){
+            filters.add(eq("executionId", executionId));
+        }
+        
+        // if any status is given to filter
+        if(statuses != null && !statuses.isEmpty()){
+            filters.add(in("status", statuses.stream().map(s -> s.name())));
+        }
+        
+        // make combined filter
+        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
+        
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get filtered page
+            var filtered = this.iterations
+                    .find(session, combined)
+                    .sort(descending("timestamp"))
+                    .skip(page * size)
+                    .limit(size)
+                    .into(new ArrayList<>());
+            
+            // count overall documents in query
+            var count = this.executions.countDocuments(session, combined);
+            
+            return new IterationsResponse(filtered, count);
+        }));
+    }
     
     /**
      * Inserts a job iteration into the data store
      * 
-     * @param iterationInput The job iteration to save
+     * @param input The job iteration to save
      * @return Returns saved job iteration
      * @throws SchedulerDataException
      */
-    public Iteration insertIteration(IterationInput iterationInput) throws SchedulerDataException;
+    @Override
+    public Iteration insertIteration(IterationInput input) throws SchedulerDataException {
+        
+        // validation log
+        var validation = new ArrayList<String>();
+        
+        // make sure job id is provided
+        if(Str.blank(input.getJobId())){
+            validation.add("The job id is mandatory for iteration");
+        }
+        
+        // make sure execution id is provided
+        if(Str.blank(input.getExecutionId())){
+            validation.add("The execution id is mandatory for iteration");
+        }
+        
+        // make sure session id is provided
+        if(Str.blank(input.getSession())){
+            validation.add("The session id is mandatory for iteration");
+        }
+        
+        // make sure status is given
+        if(input.getStatus() == null){
+            validation.add("The iteration must have a status");
+        }
+        
+        // in case of any error raise an exception
+        if(!validation.isEmpty()){
+            throw new SchedulerDataException("Invalid Iteration", validation);
+        }
+        
+        // the new identifier
+        var newId = ObjectId.get().toHexString();
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // build new iteration to save
+            var iteration = Iteration.builder()
+                    .id(newId)
+                    .jobId(input.getJobId())
+                    .executionId(input.getExecutionId())
+                    .session(input.getSession())
+                    .status(input.getStatus())
+                    .message(input.getMessage())
+                    .payload(input.getPayload())
+                    .runtime(input.getRuntime())
+                    .timestamp(input.getTimestamp() == null ? new Date() : input.getTimestamp())
+                    .build();
+            
+            // perform insert operation
+            var inserted = this.iterations.insertOne(session, iteration);
+            
+            // could not insert
+            if(inserted.getInsertedId() == null){
+                throw new SchedulerDataException("Iteration Not Saved", Arrays.asList("The iteratoin was not saved"));
+            }
+            
+            // get saved object if available
+            var savedOne = this.iterations.find(session, this.hasId(newId)).first();
+            
+            // something went wrong and saved entity is missing
+            if(savedOne == null){
+                throw new SchedulerDataException("Iteration Missing", Arrays.asList("The iteration was not saved"));
+            }
+            
+            // return inserted
+            return savedOne;
+        }));   
+    }
     
     /**
      * Deletes an entry by id and returns deleted one
@@ -805,7 +987,23 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns deleted job iteration item
      * @throws SchedulerDataException
      */
-    public Optional<Iteration> deleteIterationById(String id) throws SchedulerDataException;
+    @Override
+    public Optional<Iteration> deleteIterationById(String id) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get existing item by id
+            var existing = this.iterations.find(session, this.hasId(id)).first();
+            
+            // delete if exists
+            if(existing != null) {
+                // delete single entity
+                this.iterations.deleteOne(session, this.hasId(id));
+            }
+            
+            return Optional.ofNullable(existing);
+        }));
+    }
     
     /**
      * Deletes all the iterations for the given job id
@@ -814,7 +1012,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of removed job iteration entries
      * @throws SchedulerDataException
      */
-    public long deleteJobIterations(String jobId) throws SchedulerDataException;
+    @Override
+    public long deleteJobIterations(String jobId) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.deleteMany(session, eq("jobId", jobId)).getDeletedCount();
+        }));
+    }
     
     /**
      * Deletes all the iterations for the given execution id
@@ -823,7 +1027,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of removed execution iteration entries
      * @throws SchedulerDataException
      */
-    public long deleteExecutionIterations(String executionId) throws SchedulerDataException;
+    @Override
+    public long deleteExecutionIterations(String executionId) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.deleteMany(session, eq("executionId", executionId)).getDeletedCount();
+        }));
+    }
     
     /**
      * Deletes all the iterations
@@ -831,7 +1041,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of deleted records
      * @throws SchedulerDataException
      */
-    public long deleteAllIterations() throws SchedulerDataException;
+    @Override
+    public long deleteAllIterations() throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.deleteMany(session, new BsonDocument()).getDeletedCount();
+        }));
+    }
     
     /**
      * Deletes all the iterations before given timestamp
@@ -840,7 +1056,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of deleted items
      * @throws SchedulerDataException
      */
-    public long deleteIterationsBefore(Date timestamp) throws SchedulerDataException;
+    @Override
+    public long deleteIterationsBefore(Date timestamp) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.iterations.deleteMany(session, lt("timestamp", timestamp)).getDeletedCount();
+        }));
+    }
     
     /**
      * Gets all the worker sessions
@@ -848,7 +1070,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of all worker sessions
      * @throws SchedulerDataException
      */
-    public List<WorkerSession> getAllWorkerSessions() throws SchedulerDataException;
+    @Override
+    public List<WorkerSession> getAllWorkerSessions() throws SchedulerDataException {
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.workers.find(session, new BsonDocument()).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets the set of worker sessions within a cluster
@@ -857,7 +1085,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of cluster worker sessions
      * @throws SchedulerDataException
      */
-    public List<WorkerSession> getAllWorkerSessions(String cluster) throws SchedulerDataException;
+    @Override
+    public List<WorkerSession> getAllWorkerSessions(String cluster) throws SchedulerDataException {
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.workers.find(session, eq("cluster", cluster)).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets the worker session by identifier
@@ -866,16 +1100,141 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns agent definition if found
      * @throws SchedulerDataException
      */
-    public Optional<WorkerSession> getWorkerSessionId(String id) throws SchedulerDataException;
+    @Override
+    public Optional<WorkerSession> getWorkerSessionById(String id) throws SchedulerDataException {
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return Optional.ofNullable(this.workers.find(session, this.hasId(id)).first());
+        }));
+    }
     
     /**
      * Inserts a agent definition into the data store
      * 
-     * @param session The session to insert
+     * @param input The worker session input
      * @return Returns saved agent definition
      * @throws SchedulerDataException
      */
-    public WorkerSession upsertWorkerSession(WorkerSession session) throws SchedulerDataException;
+    @Override
+    public WorkerSession insertWorkerSession(WorkerSessionInput input) throws SchedulerDataException {
+        
+        // validation log
+        var validation = new ArrayList<String>();
+      
+        // make sure cluster value is fine
+        if(Str.blank(input.getCluster()) || !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
+            validation.add("The cluster value is missing or invalid");
+        }
+        
+        // make sure worker value is fine
+        if(Str.blank(input.getWorker()) || !NAME_REGEX.asMatchPredicate().test(input.getWorker())){
+            validation.add("The worker value is missing or invalid");
+        }
+        
+        // make sure max idle time is a positive value
+        if(input.getMaxIdle() == null || input.getMaxIdle() <= 0){
+            validation.add("The maximum idle time should be a positive value");
+        }
+                
+        // in case of any issue raise an exception
+        if(!validation.isEmpty()){
+            throw new SchedulerDataException("Invalid Worker", validation);
+        }
+        
+        // new entity id
+        var newId = ObjectId.get().toHexString();
+        
+        // the current time
+        var now = new Date();
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // build new session to save
+            var worker = WorkerSession.builder()
+                    .id(newId)
+                    .cluster(input.getCluster())
+                    .worker(input.getWorker())
+                    .tenant(input.getTenant())
+                    .maxIdle(input.getMaxIdle())
+                    .created(now)
+                    .updated(now)
+                    .activity(WorkerActivity.REGISTER)
+                    .build();
+                    
+            
+            // perform insert operation
+            var inserted = this.workers.insertOne(session, worker);
+            
+            // could not insert
+            if(inserted.getInsertedId() == null){
+                throw new SchedulerDataException("Worker Session Not Saved", Arrays.asList("The worker session was not saved"));
+            }
+            
+            // get saved object if available
+            var savedOne = this.workers.find(session, this.hasId(newId)).first();
+            
+            // something went wrong and saved entity is missing
+            if(savedOne == null){
+                throw new SchedulerDataException("Worker Session Missing", Arrays.asList("The worker session was not saved"));
+            }
+            
+            // return inserted
+            return savedOne;
+        })); 
+    }
+    
+    /**
+     * Updates a agent definition in the data store
+     * 
+     * @param id The id of worker session
+     * @param activity The activity to modify
+     * @return Returns saved worker session
+     * @throws SchedulerDataException
+     */
+    @Override
+    public WorkerSession updateWorkerSession(String id, WorkerActivity activity) throws SchedulerDataException {
+        // raise error in case of any issue
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Cannot update", Arrays.asList("Missing session identifier"));
+        }
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // try get worker to update
+            var worker = this.workers.find(session, this.hasId(id)).first();
+            
+            // check if a worker is missing
+            if(worker == null){
+                throw new SchedulerDataException("Missing Worker", Arrays.asList("The target worker is missing"));
+            }
+                        
+            // the update fields
+            Map updateFields = Map.of("updated", new Date(), "activity", activity != null ? activity : WorkerActivity.HEARTBEAT);
+            
+            // the update entity
+            var updateEntity = new Document("$set", new Document(updateFields));
+            
+            // the result of update operation
+            var updateResult = this.workers.updateOne(session, this.hasId(id), updateEntity);
+            
+            // something went wrong while updating
+            if(updateResult.getModifiedCount() != 1){
+                throw new SchedulerDataException("Worker Update Failed", Arrays.asList("The update of worker failed"));
+            }
+            
+            // get updated entity
+            var entity = this.workers.find(session, this.hasId(id)).first();
+            
+            // something went wrong and updated entity is missing
+            if(entity == null){
+                throw new SchedulerDataException("Worker Update failed", Arrays.asList("The updated worker was not found"));
+            }
+            
+            return entity;
+        }));
+    }
     
     /**
      * Deletes all the idle sessions for the given cluster and machine
