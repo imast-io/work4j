@@ -1,39 +1,40 @@
 package io.imast.work4j.data.exception;
 
-import io.imast.work4j.model.validate.DataValidation;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * The scheduler data exception 
  * 
  * @author davitp
  */
-public class SchedulerDataException extends Exception {
+public class SchedulerDataException extends RuntimeException {
     
     /**
-     * The validation model
+     * The error messages
      */
-    private final DataValidation validation;
+    private final List<String> errors;
     
     /**
      * Creates new scheduler data exception
      * 
      * @param message The exception message
-     * @param validation The validation info
+     * @param errors The error messages
      * @param cause The exception cause
      */
-    public SchedulerDataException(String message, DataValidation validation, Throwable cause){
+    public SchedulerDataException(String message, List<String> errors, Throwable cause){
         super(message, cause);
-        this.validation = validation;
+        this.errors = errors == null ? new ArrayList<>() : errors;
     }
     
     /**
      * Creates scheduler data exception
      * 
      * @param message The message of exception
-     * @param validation The validation info
+     * @param errors The set of error messages
      */
-    public SchedulerDataException(String message, DataValidation validation){
-        this(message, validation, null);
+    public SchedulerDataException(String message, List<String> errors){
+        this(message, errors, null);
     }
     
     /**
@@ -42,7 +43,7 @@ public class SchedulerDataException extends Exception {
      * @param message The message of exception
      */
     public SchedulerDataException(String message){
-        this(message, null);
+        this(message, new ArrayList<>());
     }
     
     /**
@@ -52,15 +53,15 @@ public class SchedulerDataException extends Exception {
      */
     public SchedulerDataException(Throwable cause){
         super(cause);
-        this.validation = null;
+        this.errors = new ArrayList<>();
     }
     
     /**
-     * Gets the validation data
+     * Gets the error messages
      * 
-     * @return Returns the validation info
+     * @return Returns the error messages
      */
-    public DataValidation getValidation(){
-        return this.validation;
+    public List<String> getErrors(){
+        return this.errors;
     }
 }

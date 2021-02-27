@@ -1,17 +1,21 @@
 package io.imast.work4j.data.impl;
 
+import com.mongodb.client.ClientSession;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Sorts.descending;
 import io.imast.core.Str;
 import io.imast.work4j.data.SchedulerRepository;
 import io.imast.work4j.data.exception.SchedulerDataException;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobDefinitionInput;
 import io.imast.work4j.model.JobRequestResult;
+import io.imast.work4j.model.TriggerType;
 import io.imast.work4j.model.execution.ExecutionStatus;
+import io.imast.work4j.model.execution.ExecutionUpdateInput;
 import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
 import io.imast.work4j.model.execution.JobExecutionInput;
@@ -21,12 +25,18 @@ import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.JobIterationsResult;
 import io.imast.work4j.model.worker.WorkerSession;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import org.bson.BsonDocument;
+import org.bson.Document;
 import org.bson.conversions.Bson;
+import org.bson.types.ObjectId;
 
 /**
  * The mongo repository for the scheduler data
@@ -39,6 +49,16 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * The table prefix for the source collections
      */
     protected static final String COLLECTION_PREFIX = "work4j";
+    
+    /**
+     * The name regex pattern
+     */
+    protected static Pattern NAME_REGEX = Pattern.compile("^[a-zA-Z0-9_]+$");
+    
+    /**
+     * The folder regex pattern
+     */
+    protected static Pattern FOLDER_REGEX = Pattern.compile("^(\\/[A-Za-z0-9_]+)*\\/$");
     
     /**
      * The mongo database client
@@ -83,7 +103,6 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
         this.iterations = this.mongoDatabase.getCollection(this.collection("iterations"), Iteration.class);
         this.workers = this.mongoDatabase.getCollection(this.collection("workers"), WorkerSession.class);
         this.executions = this.mongoDatabase.getCollection(this.collection("executions"), JobExecution.class);
-
     }
     
     /**
@@ -144,9 +163,8 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     @Override
     public Optional<JobDefinition> getJobById(String id) throws SchedulerDataException {
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
-            return Optional.ofNullable(this.definitions.find(session, eq("_id", id)).first());
-        }));
-        
+            return Optional.ofNullable(this.definitions.find(session, this.hasId(id)).first());
+        }));   
     }
     
     /**
@@ -160,27 +178,173 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns a page of job definitions
      * @throws SchedulerDataException
      */
-    public JobRequestResult getJobPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException;
+    @Override
+    public JobRequestResult getJobPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException {
+    
+        // the target filters
+        var filters = new ArrayList<Bson>();
+        
+        // add type filter if given
+        if(!Str.blank(type)){
+            filters.add(eq("type", type));
+        }
+        
+        // add tenant filter if given
+        if(!Str.blank(tenant)){
+            filters.add(eq("tenant", tenant));
+        }
+        
+        // add cluster filter if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("cluster", cluster));
+        }
+        
+        // combined filter
+        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
+        
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get filtered page
+            var filtered = this.definitions
+                    .find(session, combined)
+                    .sort(descending("name"))
+                    .skip(page * size)
+                    .limit(size)
+                    .into(new ArrayList<>());
+            
+            // count overall documents in query
+            var count = this.definitions.countDocuments(session, combined);
+            
+            return new JobRequestResult(filtered, count);
+        }));
+    }
     
     /**
      * Saves a job definition into the data store
      * 
-     * @param definitionInput The job definition input to save
+     * @param input The job definition input to save
      * @param replace The optional flag that allows to replace
      * @return Returns saved job definition
      * @throws SchedulerDataException
      */
-    public JobDefinition insertJob(JobDefinitionInput definitionInput, boolean replace) throws SchedulerDataException;
+    @Override
+    public JobDefinition insertJob(JobDefinitionInput input, boolean replace) throws SchedulerDataException {
+        
+        // the input validation
+        var validation = this.validateDefinitionInput(input);
+        
+        // in case of any errors do not continue
+        if(!validation.isEmpty()){
+            throw new SchedulerDataException("Invalid Definition", validation);
+        }
+        
+        // the existing item filter
+        var existingFilter = and(
+                eq("name", input.getName()),
+                eq("folder", input.getFolder())
+        );
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // try get existing
+            var existing = this.definitions.find(session, existingFilter).first();
+            
+            // if already exists and no replacement is required report an error
+            if(existing != null && !replace){
+                throw new SchedulerDataException("Duplicate Definition", Arrays.asList("The item with given location already exists"));
+            }
+            
+            // if item exists but replacement is allowed perform an update operation insted
+            if(existing != null && replace){
+                return this.updateJobImpl(session, existing, input);
+            }
+            
+            // get current time
+            var now = new Date();
+            
+            // generate new id for object
+            var newId = ObjectId.get().toHexString();
+            
+            // construct new definition to save
+            var definition = JobDefinition.builder()
+                    .id(newId)
+                    .name(input.getName())
+                    .folder(input.getFolder())
+                    .type(input.getType())
+                    .tenant(input.getTenant())
+                    .cluster(input.getCluster())
+                    .triggers(input.getTriggers())
+                    .options(input.getOptions())
+                    .selectors(input.getSelectors())
+                    .payload(input.getPayload())
+                    .extra(input.getExtra())
+                    .createdBy(input.getCreatedBy())
+                    .modifiedBy(input.getCreatedBy())
+                    .created(now)
+                    .modified(now)
+                    .build();
+            
+            // perform insert operation
+            var inserted = this.definitions.insertOne(session, definition);
+            
+            // could not insert
+            if(inserted.getInsertedId() == null){
+                throw new SchedulerDataException("Definition Not Saved", Arrays.asList("The definition was not saved"));
+            }
+            
+            // get saved object if available
+            var savedOne = this.definitions.find(session, eq("_id", newId)).first();
+            
+            // something went wrong and saved entity is missing
+            if(savedOne == null){
+                throw new SchedulerDataException("Definition Missing", Arrays.asList("The definition was not saved"));
+            }
+            
+            // insert new entity
+            return savedOne;
+        }));
+    }
     
     /**
      * Updates an existing job definition 
      * 
      * @param id The job definition id
-     * @param definitionInput The job definition input to update
+     * @param input The job definition input to update
      * @return Returns saved job definition
      * @throws SchedulerDataException
      */
-    public JobDefinition updateJob(String id, JobDefinitionInput definitionInput) throws SchedulerDataException;
+    @Override
+    public JobDefinition updateJob(String id, JobDefinitionInput input) throws SchedulerDataException {
+        
+        // make sure id is provided for update
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Update Failed", Arrays.asList("The job update requires a valid identifier"));
+        }
+        
+        // the input validation
+        var validation = this.validateDefinitionInput(input);
+        
+        // in case of any errors do not continue
+        if(!validation.isEmpty()){
+            throw new SchedulerDataException("Invalid Definition", validation);
+        }
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get existing instance to update
+            var existing = this.definitions.find(session, eq("_id", id)).first();
+            
+            // there is no existing object to update
+            if(existing == null){
+                throw new SchedulerDataException("Update Error", Arrays.asList("The entity with given id is missing."));
+            }
+            
+            return this.updateJobImpl(session, existing, input);
+        }));
+    }
     
     /**
      * Deletes an entry by id and returns deleted one
@@ -189,7 +353,23 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns deleted job definition item
      * @throws SchedulerDataException
      */
-    public Optional<JobDefinition> deleteJobById(String id) throws SchedulerDataException;
+    @Override
+    public Optional<JobDefinition> deleteJobById(String id) throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get existing item by id
+            var existing = this.definitions.find(session, this.hasId(id)).first();
+            
+            // delete if exists
+            if(existing != null) {
+                // delete single entity
+                this.definitions.deleteOne(session, this.hasId(id));
+            }
+            
+            return Optional.ofNullable(existing);
+        }));
+    }
     
     /**
      * Deletes an entry by location
@@ -199,7 +379,30 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns deleted job definition item
      * @throws SchedulerDataException
      */
-    public Optional<JobDefinition> deleteJobByPath(String folder, String name) throws SchedulerDataException;
+    @Override
+    public Optional<JobDefinition> deleteJobByPath(String folder, String name) throws SchedulerDataException {
+        
+        // the existing item filter
+        var existingFilter = and(
+                eq("name", name),
+                eq("folder", folder)
+        );
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get existing item by name and folder
+            var existing = this.definitions.find(session, existingFilter).first();
+            
+            // delete if exists
+            if(existing != null) {
+                // delete single entity
+                this.definitions.deleteOne(session, this.hasId(existing.getId()));
+            }
+            
+            return Optional.ofNullable(existing);
+        }));
+    }
     
     /**
      * Deletes all the records
@@ -207,7 +410,14 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns number of deleted records
      * @throws SchedulerDataException
      */
-    public long deleteAllJobs() throws SchedulerDataException;
+    @Override
+    public long deleteAllJobs() throws SchedulerDataException {
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.definitions.deleteMany(session, new BsonDocument()).getDeletedCount();
+        }));
+    }
     
     /**
      * Gets all the job executions
@@ -218,7 +428,35 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of all job executions
      * @throws SchedulerDataException
      */
-    public List<JobExecution> getAllExecutions(String tenant, String cluster, String type) throws SchedulerDataException;
+    @Override
+    public List<JobExecution> getAllExecutions(String tenant, String cluster, String type) throws SchedulerDataException {
+    
+        // the target filters
+        var filters = new ArrayList<Bson>();
+        
+        // add type filter if given
+        if(!Str.blank(type)){
+            filters.add(eq("type", type));
+        }
+        
+        // add tenant filter if given
+        if(!Str.blank(tenant)){
+            filters.add(eq("tenant", tenant));
+        }
+        
+        // add cluster filter if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("cluster", cluster));
+        }
+        
+        // combined filter
+        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
+        
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.executions.find(session, combined).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets all the job executions of job
@@ -227,7 +465,19 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns set of all job executions
      * @throws SchedulerDataException
      */
-    public List<JobExecution> getExecutionsByJob(String jobId) throws SchedulerDataException;
+    @Override
+    public List<JobExecution> getExecutionsByJob(String jobId) throws SchedulerDataException {
+        
+        // check if job id is not given
+        if(Str.blank(jobId)){
+            throw new SchedulerDataException("Job ID is missing", Arrays.asList("Job ID should be set to get its executions"));
+        }
+        
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.executions.find(session, eq("jobId", jobId)).into(new ArrayList<>());
+        }));
+    }
     
     /**
      * Gets the page of executions in the system
@@ -240,7 +490,46 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns page of executions
      * @throws SchedulerDataException
      */
-    public ExecutionsResponse getExecutionsPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException;
+    @Override
+    public ExecutionsResponse getExecutionsPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException {
+        // the target filters
+        var filters = new ArrayList<Bson>();
+        
+        // add type filter if given
+        if(!Str.blank(type)){
+            filters.add(eq("type", type));
+        }
+        
+        // add tenant filter if given
+        if(!Str.blank(tenant)){
+            filters.add(eq("tenant", tenant));
+        }
+        
+        // add cluster filter if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("cluster", cluster));
+        }
+        
+        // combined filter
+        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
+        
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get filtered page
+            var filtered = this.executions
+                    .find(session, combined)
+                    .sort(descending("name"))
+                    .skip(page * size)
+                    .limit(size)
+                    .into(new ArrayList<>());
+            
+            // count overall documents in query
+            var count = this.executions.countDocuments(session, combined);
+            
+            return new ExecutionsResponse(filtered, count);
+        }));
+    }
     
     /**
      * Gets the job executions by id
@@ -249,42 +538,173 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @return Returns the job execution if found
      * @throws SchedulerDataException
      */
-    public Optional<JobExecution> getExecutionById(String id) throws SchedulerDataException;
-    
-    /**
-     * Gets all the job iterations 
-     * 
-     * @return Returns set of all iterations 
-     * @throws SchedulerDataException 
-     */
-    public List<Iteration> getAllIterations() throws SchedulerDataException;
-    
-    /**
-     * Gets all the job iterations for the given job
-     * 
-     * @param jobId The job id to filter
-     * @return Returns set of all job iterations 
-     * @throws SchedulerDataException 
-     */
-    public List<Iteration> getJobIterations(String jobId) throws SchedulerDataException;
-    
-    /**
-     * Gets all the iterations for the given execution
-     * 
-     * @param executionId The job id to filter
-     * @return Returns set of all job iterations for execution
-     * @throws SchedulerDataException
-     */
-    public List<Iteration> getExecutionIterations(String executionId) throws SchedulerDataException;
+    @Override
+    public Optional<JobExecution> getExecutionById(String id) throws SchedulerDataException {
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return Optional.ofNullable(this.executions.find(session, this.hasId(id)).first());
+        }));
+    }
     
     /**
      * Inserts new job execution based on input data
      * 
-     * @param executionInput The execution input
+     * @param input The execution input
      * @return Returns created execution instance
      * @throws SchedulerDataException 
      */
-    public JobExecution insertJobExecution(JobExecutionInput executionInput) throws SchedulerDataException;
+    @Override
+    public JobExecution insertJobExecution(JobExecutionInput input) throws SchedulerDataException {
+        
+        // the validation input
+        var validation = this.validateExecutionInput(input);
+        
+        // validation log is not empty
+        if(!validation.isEmpty()){
+            throw new SchedulerDataException("Invalid Input", validation);
+        }
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // try get job definition
+            var jobDefinition = this.definitions.find(session, this.hasId(input.getJobId())).first();
+            
+            // check if a valid job definition is there to execute
+            if(jobDefinition == null){
+                throw new SchedulerDataException("Missing Job", Arrays.asList("The Job Definition does not exist"));
+            }
+            
+            // get current time
+            var now = new Date();
+            
+            // generate new id for object
+            var newId = ObjectId.get().toHexString();
+            
+            // build final payload
+            var payload = jobDefinition.getPayload();
+            
+            // if override values are given add to map
+            if(input.getPayloadOverride() != null){
+                payload = Map.copyOf(jobDefinition.getPayload());
+                payload.putAll(input.getPayloadOverride());
+            }
+            
+            // construct new definition to save
+            var execution = JobExecution.builder()
+                    .id(newId)
+                    .jobId(jobDefinition.getId())
+                    .name(jobDefinition.getName())
+                    .folder(jobDefinition.getFolder())
+                    .type(jobDefinition.getType())
+                    .status(input.getInitialStatus() == null ? ExecutionStatus.ACTIVE : input.getInitialStatus())
+                    .completionSeverity(null)
+                    .triggers(jobDefinition.getTriggers())
+                    .tenant(jobDefinition.getTenant())
+                    .cluster(Str.blank(input.getCluster()) ? jobDefinition.getCluster() : input.getCluster())
+                    .options(jobDefinition.getOptions())
+                    .payload(payload)
+                    .createdBy(jobDefinition.getCreatedBy())
+                    .modifiedBy(jobDefinition.getModifiedBy())
+                    .defined(jobDefinition.getCreated())
+                    .modified(now)
+                    .submited(now)
+                    .extra(jobDefinition.getExtra())
+                    .build();
+            
+            // perform insert operation
+            var inserted = this.executions.insertOne(session, execution);
+            
+            // could not insert
+            if(inserted.getInsertedId() == null){
+                throw new SchedulerDataException("Execution Not Saved", Arrays.asList("The execution was not saved"));
+            }
+            
+            // get saved object if available
+            var savedOne = this.executions.find(session, this.hasId(newId)).first();
+            
+            // something went wrong and saved entity is missing
+            if(savedOne == null){
+                throw new SchedulerDataException("Execution Missing", Arrays.asList("The execution was not saved"));
+            }
+            
+            // insert new entity
+            return savedOne;
+        }));   
+    }
+    
+    /**
+     * Updates the execution status of the given job instance
+     * 
+     * @param id The execution id
+     * @param input The execution update input
+     * @return Returns updated job execution
+     * @throws SchedulerDataException 
+     */
+    @Override
+    public JobExecution updateExecution(String id, ExecutionUpdateInput input) throws SchedulerDataException {
+        
+        // error list
+        var errors = new ArrayList<String>();
+        
+        // use empty input just in case of missing one
+        var validInput = input == null ? ExecutionUpdateInput.builder().build() : input;
+        
+        // check id
+        if(Str.blank(id)){
+            errors.add("The id of execution is missing");
+        }
+        
+        // check status
+        if(validInput.getStatus() == null){
+            errors.add("The new status for execution is missing");
+        }
+        
+        // the completion severity
+        if(validInput.getStatus() == ExecutionStatus.COMPLETED && validInput.getSeverity() == null){
+            errors.add("The completed status requires a valid severity");
+        }
+        
+        // raise error in case of any issue
+        if(!errors.isEmpty()){
+            throw new SchedulerDataException("Cannot update", errors);
+        }
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // try get execution to update
+            var execution = this.executions.find(session, this.hasId(id)).first();
+            
+            // check if a execution is missing
+            if(execution == null){
+                throw new SchedulerDataException("Missing Execution", Arrays.asList("The target execution is missing"));
+            }
+                        
+            // the update fields
+            Map updateFields = Map.of("updated", new Date(), "status", validInput.getStatus(), "completionSeverity", validInput.getSeverity());
+            
+            // the update entity
+            var updateEntity = new Document("$set", new Document(updateFields));
+            
+            // the result of update operation
+            var updateResult = this.executions.updateOne(session, this.hasId(id), updateEntity);
+            
+            // something went wrong while updating
+            if(updateResult.getModifiedCount() != 1){
+                throw new SchedulerDataException("Execution Update Failed", Arrays.asList("The update of execution failed"));
+            }
+            
+            // get updated entity
+            var entity = this.executions.find(session, this.hasId(id)).first();
+            
+            // something went wrong and updated entity is missing
+            if(entity == null){
+                throw new SchedulerDataException("Execution Update failed", Arrays.asList("The updated execution was not found"));
+            }
+            
+            return entity;
+        }));
+    }
     
     /**
      * Deletes the job execution by id
@@ -322,14 +742,30 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     public long deleteAllExecutions() throws SchedulerDataException;
     
     /**
-     * Updates the execution status of the given job instance
+     * Gets all the job iterations 
      * 
-     * @param id The execution id
-     * @param status The new execution status
-     * @return Returns updated job execution
+     * @return Returns set of all iterations 
      * @throws SchedulerDataException 
      */
-    public JobExecution updateExecutionStatus(String id, ExecutionStatus status) throws SchedulerDataException;
+    public List<Iteration> getAllIterations() throws SchedulerDataException;
+    
+    /**
+     * Gets all the job iterations for the given job
+     * 
+     * @param jobId The job id to filter
+     * @return Returns set of all job iterations 
+     * @throws SchedulerDataException 
+     */
+    public List<Iteration> getJobIterations(String jobId) throws SchedulerDataException;
+    
+    /**
+     * Gets all the iterations for the given execution
+     * 
+     * @param executionId The job id to filter
+     * @return Returns set of all job iterations for execution
+     * @throws SchedulerDataException
+     */
+    public List<Iteration> getExecutionIterations(String executionId) throws SchedulerDataException;
     
     /**
      * Gets the job iteration by identifier
@@ -476,9 +912,137 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @param name The collection name 
      * @return Returns collection name with prefix
      */
-    private String collection(String name){
+    protected final String collection(String name){
         return String.format("%s_%s", COLLECTION_PREFIX, name);
     } 
+    
+    /**
+     * Validates the definition input
+     * 
+     * @param input The input to validate
+     * @return Returns validation messages
+     */
+    protected List<String> validateDefinitionInput(JobDefinitionInput input){
+        
+        // the set of issues
+        var issues = new ArrayList<String>();
+        
+        // name does not match the required criteria
+        if(Str.blank(input.getName()) || !NAME_REGEX.asMatchPredicate().test(input.getName())){
+            issues.add("The job name is blank or contains invalid characters");
+        }
+        
+        // folder does not match the required criteria
+        if(Str.blank(input.getFolder()) || !FOLDER_REGEX.asMatchPredicate().test(input.getFolder())){
+            issues.add("The job folder is blank or contains invalid characters");
+        }
+        
+        // cluster does not match the required criteria
+        if(Str.blank(input.getCluster()) || !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
+            issues.add("The job cluster is blank or contains invalid characters");
+        }
+        
+        // type does not match the required criteria
+        if(Str.blank(input.getType()) || !NAME_REGEX.asMatchPredicate().test(input.getType())){
+            issues.add("The job type is blank or contains invalid characters");
+        }
+        
+        // unique trigger names
+        var triggerNames = new HashSet<String>();
+        
+        // get triggers to check
+        var triggers = input.getTriggers();
+        
+        // empty list for safety
+        if(triggers == null){
+            triggers = Arrays.asList();
+        }
+        
+        // validate each trigger
+        triggers.forEach(trigger -> {
+            
+            // trigger name does not match the required criteria
+            if(Str.blank(trigger.getName()) || !NAME_REGEX.asMatchPredicate().test(trigger.getName())){
+                issues.add("The trigger name is blank or contains invalid characters");
+            }
+            
+            // multiple triggers with same name
+            if(!triggerNames.add(trigger.getName())){
+                issues.add(String.format("The trigger with name %s is defined more than once", trigger.getName()));
+            }
+            
+            // validate cron expression to be present in case of cron trigger
+            if(trigger.getType() == TriggerType.CRON && Str.blank(trigger.getCron())){
+                issues.add(String.format("The cron trigger %s should have a valid cron expression", trigger.getCron()));
+            }
+        });
+        
+        return issues;
+    }
+    
+    /**
+     * Validates the execution input
+     * 
+     * @param input The input to validate
+     * @return Returns validation messages
+     */
+    protected List<String> validateExecutionInput(JobExecutionInput input){
+        
+        // the set of issues
+        var issues = new ArrayList<String>();
+        
+        // if job id not given then is not valid
+        if(Str.blank(input.getJobId())){
+            issues.add("The job id is mandatory to execute");
+        }
+        
+        // if cluster override value is given but is malformed report issue
+        if(Str.blank(input.getCluster()) && !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
+            issues.add("The job cluster override value is given but contains invalid characters");
+        }
+        
+        return issues;
+    }
+
+    /**
+     * Update the existing job definition with given input
+     * @param session The session context of client
+     * @param existing The existing instance
+     * @param input The input to update
+     * @return Returns updated entity
+     */
+    protected JobDefinition updateJobImpl(ClientSession session, JobDefinition existing, JobDefinitionInput input) throws SchedulerDataException {
+        
+        // build the entity to perform update operation
+        var toUpdate = existing.toBuilder()
+                .id(existing.getId())
+                .name(input.getName())
+                .folder(input.getFolder())
+                .type(input.getType())
+                .tenant(input.getTenant())
+                .cluster(input.getCluster())
+                .triggers(input.getTriggers())
+                .options(input.getOptions())
+                .selectors(input.getSelectors())
+                .payload(input.getPayload())
+                .extra(input.getExtra())
+                .modifiedBy(input.getModifiedBy())
+                .modified(new Date())
+                .build();
+        
+        // perform replace operation and get result
+        this.definitions.replaceOne(session, this.hasId(existing.getId()), toUpdate);
+        
+        // try get updated item
+        var updated = this.definitions.find(session, this.hasId(existing.getId())).first();
+    
+        // updated entity does not exist
+        if(updated == null){
+            throw new SchedulerDataException("Update Failed", Arrays.asList("The updated entity does not exist"));
+        }
+        
+        return updated;
+    }
     
     /**
      * Handle the exception simply by throwing
@@ -492,8 +1056,21 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
         try{
             return fn.get();
         }
+        catch(SchedulerDataException e){
+            throw e;
+        }
         catch(Throwable e){
             throw new SchedulerDataException(e);
         }
+    }
+
+    /**
+     * Builds the identity filter
+     * 
+     * @param id The id to filter by
+     * @return Returns filter by id
+     */
+    protected Bson hasId(String id){
+        return eq("_id", id);
     }
 }
