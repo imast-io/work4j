@@ -1,6 +1,5 @@
 package io.imast.work4j.worker.controller;
 
-import io.imast.work4j.channel.WorkerSupervior;
 import java.util.List;
 import java.util.Properties;
 import io.imast.core.Str;
@@ -259,7 +258,7 @@ public class WorkerControllerBuilder {
         
         // add work4j listeners
         try{
-            scheduler.getListenerManager().addSchedulerListener(new JobSchedulerListener(this.schedulerChannel));
+            scheduler.getListenerManager().addSchedulerListener(new JobSchedulerListener(scheduler, this.schedulerChannel));
             scheduler.getListenerManager().addJobListener(new EveryJobListener(this.schedulerChannel));
             scheduler.getListenerManager().addTriggerListener(new EveryTriggerListener(this.schedulerChannel));
         }
