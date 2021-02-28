@@ -5,10 +5,13 @@ import io.imast.work4j.model.execution.CompletionSeverity;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
+import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.SchedulerListener;
 import org.quartz.Trigger;
+import org.quartz.Trigger.TriggerState;
 import org.quartz.TriggerKey;
+import org.quartz.impl.matchers.GroupMatcher;
 
 /**
  * The trigger listener
@@ -24,11 +27,18 @@ public class JobSchedulerListener implements SchedulerListener {
     protected final SchedulerChannel schedulerChannel;
     
     /**
+     * The quartz scheduler instance
+     */
+    protected final Scheduler scheduler;
+    
+    /**
      * Creates new instance of Every Job Listener
      * 
+     * @param scheduler The quartz scheduler instance
      * @param schedulerChannel The scheduler channel 
      */
-    public JobSchedulerListener(SchedulerChannel schedulerChannel) {
+    public JobSchedulerListener(Scheduler scheduler, SchedulerChannel schedulerChannel) {
+        this.scheduler = scheduler;
         this.schedulerChannel = schedulerChannel;
     }
 
@@ -58,9 +68,28 @@ public class JobSchedulerListener implements SchedulerListener {
     @Override
     public void triggerFinalized(Trigger trigger) {
         
-        // update job and get 
-        // FIXME
-        this.schedulerChannel.complete(trigger.getJobKey().getName(), CompletionSeverity.SUCCESS).subscribe();
+        // indicates if all done
+        var done = true;
+        
+        try {
+            // get triggers of job
+            var keys = this.scheduler.getTriggerKeys(GroupMatcher.triggerGroupEquals(trigger.getKey().getGroup()));
+            
+            // check all other trigger states
+            for(var key : keys){
+                done = this.scheduler.getTriggerState(key) == TriggerState.COMPLETE;
+            }
+        }
+        catch(SchedulerException error){
+            done = false;
+            log.error("Could not get job triggers");
+        }
+        
+        // report completed
+        if(done){
+            // update job and get 
+            this.schedulerChannel.complete(trigger.getJobKey().getName(), CompletionSeverity.SUCCESS).subscribe();
+        }
     }
 
     /**

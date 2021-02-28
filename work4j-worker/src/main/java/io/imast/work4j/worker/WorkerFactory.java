@@ -75,13 +75,13 @@ public class WorkerFactory {
     }
     
     /**
-     * Creates the job corresponding to the definition
+     * Creates the job corresponding to the execution
      * 
      * @param key The job key
-     * @param jobDefinition The job definition
+     * @param execution The job execution
      * @return Returns job details instance
      */
-    public JobDetail createJob(JobKey key, JobDefinition jobDefinition){
+    public JobDetail createJob(JobKey key, JobExecution execution){
         
         // instantiate a job to schedule 
         var job = JobBuilder.newJob(QuartzExecutorJob.class)
@@ -270,7 +270,7 @@ public class WorkerFactory {
                 .withIdentity(this.triggerKey(trigger), execution.getId());
         
          // if start time is given
-        if(trigger.getStartAt()!= null){
+        if(trigger.getStartAt() != null){
             triggerBuilder.startAt(trigger.getStartAt());
         } else {
             triggerBuilder.startNow();
