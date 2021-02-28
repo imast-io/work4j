@@ -4,13 +4,13 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * The worker session information
+ * The worker input
  * 
  * @author davitp
  */
 @Data
 @Builder(toBuilder = true)
-public class WorkerSessionInput {
+public class WorkerInput {
     
     /**
      * The cluster name

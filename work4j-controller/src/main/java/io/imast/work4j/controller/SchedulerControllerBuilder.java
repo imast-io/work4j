@@ -1,11 +1,6 @@
 package io.imast.work4j.controller;
 
-import io.imast.work4j.channel.notify.WorkerPublisher;
-import io.imast.work4j.data.AgentDefinitionRepository;
-import io.imast.work4j.data.JobDefinitionRepository;
-import io.imast.work4j.data.JobIterationRepository;
-import java.util.ArrayList;
-import java.util.List;
+import io.imast.work4j.data.SchedulerDataRepository;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -15,32 +10,16 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 public class SchedulerControllerBuilder {
-
-    /**
-     * The set of worker publishers
-     */
-    protected final List<WorkerPublisher> workerPublishers;
     
     /**
-     * The job definition repository
+     * The data repository for scheduler
      */
-    protected JobDefinitionRepository definitions;
-    
-    /**
-     * The job iterations repository
-     */
-    protected JobIterationRepository iterations;
-     
-    /**
-     * The agent definitions repository
-     */
-    protected AgentDefinitionRepository agents;
-    
+    protected SchedulerDataRepository data;
+        
     /**
      * Creates new instance of Scheduler Job Controller Builder
      */
     protected SchedulerControllerBuilder(){
-        this.workerPublishers = new ArrayList<>();
     }
     
     /**
@@ -48,51 +27,18 @@ public class SchedulerControllerBuilder {
      * 
      * @return Returns new builder
      */
-    public static SchedulerControllerBuilder newBuilder(){
+    public static SchedulerControllerBuilder builder(){
         return new SchedulerControllerBuilder();
     }
-        
-    /**
-     * Use the given agent repository
-     * 
-     * @param agents The agent repository
-     * @return Returns builder instance for chaining
-     */
-    public SchedulerControllerBuilder withAgents(AgentDefinitionRepository agents){
-        this.agents = agents;
-        return this;
-    }
     
     /**
-     * Use the given job repository
+     * Use the data repository
      * 
-     * @param definition The job definitions repository
+     * @param data The scheduler data repository
      * @return Returns builder instance for chaining
      */
-    public SchedulerControllerBuilder withJobDefinitions(JobDefinitionRepository definition){
-        this.definitions = definition;
-        return this;
-    }
-    
-    /**
-     * Use the given job iterations repository
-     * 
-     * @param iterations The job iterations repository
-     * @return Returns builder instance for chaining
-     */
-    public SchedulerControllerBuilder withJobIterations(JobIterationRepository iterations){
-        this.iterations = iterations;
-        return this;
-    }
-    
-    /**
-     * Use the given worker publisher
-     * 
-     * @param publisher The publisher to use
-     * @return Returns builder instance for chaining
-     */
-    public SchedulerControllerBuilder withPublisher(WorkerPublisher publisher){
-        this.workerPublishers.add(publisher);
+    public SchedulerControllerBuilder withDataRepository(SchedulerDataRepository data){
+        this.data = data;
         return this;
     }
     
@@ -102,6 +48,6 @@ public class SchedulerControllerBuilder {
      * @return Returns controller instance
      */
     public SchedulerController build(){
-        return new SchedulerController(this.definitions, this.iterations, this.agents, this.workerPublishers).initialize();
+        return new SchedulerController(this.data);
     }
 }

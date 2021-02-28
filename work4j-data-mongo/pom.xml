@@ -31,6 +31,7 @@
             <groupId>org.mongodb</groupId>
             <artifactId>mongodb-driver-sync</artifactId>
             <version>4.2.0</version>
+            <scope>provided</scope>
         </dependency>  
         
         <dependency>

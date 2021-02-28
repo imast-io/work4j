@@ -9,19 +9,33 @@ import java.util.Map;
  */
 public interface JobExecutorContext {
     
-    /**
-     * Get job code
+   /**
+     * Get job execution id
      * 
-     * @return Returns job code
+     * @return Returns job execution id
      */
-    public String getCode();
+    public String getExecutionId();
     
     /**
-     * Get job group
+     * Get job definition id
      * 
-     * @return Returns job group
+     * @return Returns job definition id
      */
-    public String getGroup();
+    public String getDefinitionId();
+    
+    /**
+     * Get job name
+     * 
+     * @return Returns job name
+     */
+    public String getName();
+    
+    /**
+     * Get job folder
+     * 
+     * @return Returns job folder
+     */
+    public String getFolder();
     
     /**
      * Get job type

@@ -1,11 +1,11 @@
 package io.imast.work4j.worker;
 
-import io.imast.work4j.worker.job.JobOps;
 import io.imast.core.Str;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.TriggerDefinition;
+import io.imast.work4j.model.execution.JobExecution;
 import io.imast.work4j.worker.job.QuartzExecutorJob;
 import io.vavr.control.Try;
 import java.time.ZoneId;
@@ -96,33 +96,32 @@ public class WorkerFactory {
      * Creates the job corresponding to the definition
      * 
      * @param job The job to init
-     * @param definition The job definition 
+     * @param execution The job definition 
      * @return Returns job details instance
      */
-    public JobDetail initJob(JobDetail job, JobDefinition definition){
+    public JobDetail initJob(JobDetail job, JobExecution execution){
 
         // the data map
         var systemData = new HashMap<String, Object>();
         
         // populte system data
-        systemData.put(JobConstants.PAYLOAD_JOB_ID, definition.getId());
-        systemData.put(JobConstants.PAYLOAD_JOB_NAME, definition.getName());
-        systemData.put(JobConstants.PAYLOAD_JOB_FOLDER, definition.getFolder());
-        systemData.put(JobConstants.PAYLOAD_JOB_TYPE, definition.getType());
-        systemData.put(JobConstants.PAYLOAD_JOB_TENANT, definition.getTenant());
-        systemData.put(JobConstants.PAYLOAD_JOB_STATUS, definition.getStatus());
-        systemData.put(JobConstants.PAYLOAD_JOB_CLUSTER, definition.getCluster());
-        systemData.put(JobConstants.PAYLOAD_JOB_EXECUTION, definition.getExecution());
-        systemData.put(JobConstants.PAYLOAD_JOB_CREATED, definition.getCreated());
-        systemData.put(JobConstants.PAYLOAD_JOB_MODIFIED, definition.getModified());
+        systemData.put(JobConstants.PAYLOAD_JOB_DEFINITION_ID, execution.getId());
+        systemData.put(JobConstants.PAYLOAD_JOB_NAME, execution.getName());
+        systemData.put(JobConstants.PAYLOAD_JOB_FOLDER, execution.getFolder());
+        systemData.put(JobConstants.PAYLOAD_JOB_TYPE, execution.getType());
+        systemData.put(JobConstants.PAYLOAD_JOB_TENANT, execution.getTenant());
+        systemData.put(JobConstants.PAYLOAD_JOB_STATUS, execution.getStatus());
+        systemData.put(JobConstants.PAYLOAD_JOB_CLUSTER, execution.getCluster());
+        systemData.put(JobConstants.PAYLOAD_JOB_OPTIONS, execution.getOptions());
+        systemData.put(JobConstants.PAYLOAD_JOB_MODIFIED, execution.getModified());
         
         // add all system data
         job.getJobDataMap().putAll(systemData);
         
         // check if there is payload in job definition populate in data
-        if(definition.getPayload() != null){
+        if(execution.getPayload() != null){
             // add all payload data
-            job.getJobDataMap().putAll(definition.getPayload());
+            job.getJobDataMap().putAll(execution.getPayload());
         }
         
         return job;
@@ -166,11 +165,11 @@ public class WorkerFactory {
     /**
      * Creates the set of Cron triggers for the given job
      * 
-     * @param jobDefinition The job definition
+     * @param execution The job execution
      * @param trigger The trigger definition
      * @return Returns job triggers
      */
-    private Set<Trigger> cronTrigger(JobDefinition jobDefinition, TriggerDefinition trigger){
+    private Set<Trigger> cronTrigger(JobExecution execution, TriggerDefinition trigger){
 
         // result quartz triggers
         var result = new HashSet<Trigger>();
@@ -192,7 +191,7 @@ public class WorkerFactory {
         
         // create trigger
         var triggerBuilder = TriggerBuilder.newTrigger()
-            .withIdentity(this.triggerKey(trigger), JobOps.identity(jobDefinition))
+            .withIdentity(this.triggerKey(trigger), execution.getId())
             .withSchedule(schedule);
 
         // if start time is given
@@ -214,11 +213,11 @@ public class WorkerFactory {
     /**
      * Creates the set of Cron triggers for the given job
      * 
-     * @param jobDefinition The job definition
+     * @param execution The job execution
      * @param trigger The trigger definition
      * @return Returns job triggers
      */
-    private Set<Trigger> periodTrigger(JobDefinition jobDefinition, TriggerDefinition trigger){
+    private Set<Trigger> periodTrigger(JobExecution execution, TriggerDefinition trigger){
         // job triggers
         var result = new HashSet<Trigger>();
      
@@ -236,7 +235,7 @@ public class WorkerFactory {
         
         // create trigger
         var triggerBuilder = TriggerBuilder.newTrigger()
-                .withIdentity(this.triggerKey(trigger), JobOps.identity(jobDefinition))
+                .withIdentity(this.triggerKey(trigger), execution.getId())
                 .withSchedule(SimpleScheduleBuilder.repeatSecondlyForever(periodSecond));
         
         // if start time is given
@@ -258,17 +257,17 @@ public class WorkerFactory {
     /**
      * Creates the set of Cron triggers for the given job
      * 
-     * @param jobDefinition The job definition
+     * @param execution The job execution
      * @param trigger The trigger definition
      * @return Returns job triggers
      */
-    public Set<Trigger> createOneTimeTriggers(JobDefinition jobDefinition, TriggerDefinition trigger){
+    public Set<Trigger> createOneTimeTriggers(JobExecution execution, TriggerDefinition trigger){
         // job triggers
         var result = new HashSet<Trigger>();
       
         // create trigger
         var triggerBuilder = TriggerBuilder.newTrigger()
-                .withIdentity(this.triggerKey(trigger), JobOps.identity(jobDefinition));
+                .withIdentity(this.triggerKey(trigger), execution.getId());
         
          // if start time is given
         if(trigger.getStartAt()!= null){
@@ -286,13 +285,13 @@ public class WorkerFactory {
     /**
      * Creates the set of triggers for the given job
      * 
-     * @param jobDefinition The job definition
+     * @param execution The job execution
      * @return Returns job triggers
      */
-    public Set<Trigger> createTriggers(JobDefinition jobDefinition){
+    public Set<Trigger> createTriggers(JobExecution execution){
         
         // triggers to traverse
-        var triggers = jobDefinition.getTriggers();
+        var triggers = execution.getTriggers();
         
         // nothing to process
         if(triggers == null){
@@ -314,13 +313,13 @@ public class WorkerFactory {
             // process based on type
             switch(trigger.getType()){
                 case CRON:
-                    quartzTriggers = this.cronTrigger(jobDefinition, trigger);
+                    quartzTriggers = this.cronTrigger(execution, trigger);
                     break;
                 case PERIODIC:
-                    quartzTriggers = this.periodTrigger(jobDefinition, trigger);
+                    quartzTriggers = this.periodTrigger(execution, trigger);
                     break;
                 case ONCE:
-                    quartzTriggers = this.createOneTimeTriggers(jobDefinition, trigger);
+                    quartzTriggers = this.createOneTimeTriggers(execution, trigger);
                     break;
             }
             

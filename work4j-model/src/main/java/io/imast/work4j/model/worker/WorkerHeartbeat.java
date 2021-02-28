@@ -4,13 +4,13 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * The worker session information
+ * The worker heartbeat info
  * 
  * @author davitp
  */
 @Data
 @Builder(toBuilder = true)
-public class WorkerSessionHeartbeat {
+public class WorkerHeartbeat {
     
     /**
      * The last activity in the session

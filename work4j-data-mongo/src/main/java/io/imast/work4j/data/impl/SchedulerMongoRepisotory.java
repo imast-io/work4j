@@ -6,11 +6,15 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Filters.expr;
 import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Filters.lt;
+import com.mongodb.client.model.IndexOptions;
+import com.mongodb.client.model.Indexes;
+import static com.mongodb.client.model.Projections.fields;
+import static com.mongodb.client.model.Projections.include;
 import static com.mongodb.client.model.Sorts.descending;
 import io.imast.core.Str;
-import io.imast.work4j.data.SchedulerRepository;
 import io.imast.work4j.data.exception.SchedulerDataException;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobDefinitionInput;
@@ -26,8 +30,8 @@ import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.IterationsResponse;
 import io.imast.work4j.model.worker.WorkerActivity;
-import io.imast.work4j.model.worker.WorkerSession;
-import io.imast.work4j.model.worker.WorkerSessionInput;
+import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.worker.WorkerInput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -41,13 +45,16 @@ import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
+import io.imast.work4j.data.SchedulerDataRepository;
+import io.imast.work4j.model.execution.ExecutionIndexEntry;
+import io.imast.work4j.model.worker.WorkerHeartbeat;
 
 /**
  * The mongo repository for the scheduler data
  * 
  * @author davitp
  */
-public class SchedulerMongoRepisotory implements SchedulerRepository {
+public class SchedulerMongoRepisotory implements SchedulerDataRepository {
 
     /**
      * The table prefix for the source collections
@@ -87,7 +94,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     /**
      * The workers collection
      */
-    private final MongoCollection<WorkerSession> workers;
+    private final MongoCollection<Worker> workers;
     
     /**
      * The executions collection
@@ -105,7 +112,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
         this.mongoDatabase = mongoDatabase;
         this.definitions = this.mongoDatabase.getCollection(this.collection("definitions"), JobDefinition.class);
         this.iterations = this.mongoDatabase.getCollection(this.collection("iterations"), Iteration.class);
-        this.workers = this.mongoDatabase.getCollection(this.collection("workers"), WorkerSession.class);
+        this.workers = this.mongoDatabase.getCollection(this.collection("workers"), Worker.class);
         this.executions = this.mongoDatabase.getCollection(this.collection("executions"), JobExecution.class);
     }
     
@@ -115,7 +122,35 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      * @throws SchedulerDataException 
      */
     @Override
-    public void ensureSchema() throws SchedulerDataException {        
+    public void ensureSchema() throws SchedulerDataException {
+        
+        try {
+            
+            // index job definitions by name (ascending)
+            this.definitions.createIndex(Indexes.ascending("name"), new IndexOptions().name("jobs_by_name"));
+            
+            // index jobs by update time (descending)
+            this.definitions.createIndex(Indexes.descending("modified"), new IndexOptions().name("jobs_by_modified"));
+            
+            // create unique index for (name, folder) pair
+            this.definitions.createIndex(Indexes.ascending("name", "folder"), new IndexOptions().name("job_unique_name_folder").unique(true));
+            
+            // index executions by name
+            this.executions.createIndex(Indexes.ascending("name"), new IndexOptions().name("executions_by_name"));
+            
+            // index executions by update time
+            this.executions.createIndex(Indexes.descending("modified"), new IndexOptions().name("executions_by_modified"));
+            
+            // create unique index for (name, folder) pair
+            this.executions.createIndex(Indexes.ascending("name", "folder"), new IndexOptions().name("execution_unique_name_folder").unique(true));
+
+            // index iterations by timestamp for easy paging
+            this.iterations.createIndex(Indexes.descending("timestamp"), new IndexOptions().name("iteration_by_timestamp_desc"));
+
+        }
+        catch (Throwable e){
+            throw new SchedulerDataException("Indexing Error", Arrays.asList("Could not create schema indexes"), e);
+        }
     }
     
     /**
@@ -166,6 +201,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<JobDefinition> getJobById(String id) throws SchedulerDataException {
+        
+        // id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Job ID is required"));
+        }
+        
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return Optional.ofNullable(this.definitions.find(session, this.hasId(id)).first());
         }));   
@@ -299,14 +340,14 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
             }
             
             // get saved object if available
-            var savedOne = this.definitions.find(session, eq("_id", newId)).first();
+            var savedOne = this.definitions.find(session, this.hasId(newId)).first();
             
             // something went wrong and saved entity is missing
             if(savedOne == null){
                 throw new SchedulerDataException("Definition Missing", Arrays.asList("The definition was not saved"));
             }
             
-            // insert new entity
+            // return new entity
             return savedOne;
         }));
     }
@@ -339,7 +380,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             
             // get existing instance to update
-            var existing = this.definitions.find(session, eq("_id", id)).first();
+            var existing = this.definitions.find(session, this.hasId(id)).first();
             
             // there is no existing object to update
             if(existing == null){
@@ -359,6 +400,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<JobDefinition> deleteJobById(String id) throws SchedulerDataException {
+        
+        // id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Job ID is required"));
+        }
+        
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             
@@ -385,6 +432,11 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<JobDefinition> deleteJobByPath(String folder, String name) throws SchedulerDataException {
+        
+        // name and folder is required
+        if(Str.blank(name) || Str.blank(folder)){
+            throw new SchedulerDataException("Missing Name or Folder", Arrays.asList("Job Name and Folder are required"));
+        }
         
         // the existing item filter
         var existingFilter = and(
@@ -484,6 +536,27 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
+     * Gets all the job executions by given ids
+     * 
+     * @param ids The set of ids
+     * @return Returns set of all job executions
+     * @throws SchedulerDataException
+     */
+    @Override
+    public List<JobExecution> getExecutionsByIds(List<String> ids) throws SchedulerDataException {
+        
+        // check if at least one id is given
+        if(ids == null || ids.isEmpty()){
+            throw new SchedulerDataException("Missing IDs", Arrays.asList("At least one execution ID is required"));
+        }
+        
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.executions.find(session, in("_id", ids)).into(new ArrayList<>());
+        }));
+    }
+    
+    /**
      * Gets the page of executions in the system
      * 
      * @param tenant The tenant to filter
@@ -536,6 +609,44 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
+     * Gets the set of execution index entries based on query
+     * 
+     * @param tenant The tenant to filter
+     * @param cluster The cluster to filter
+     * @return Returns set of execution entries
+     */
+    @Override
+    public List<ExecutionIndexEntry> getExecutionIndex(String tenant, String cluster) throws SchedulerDataException {
+        
+        // check the cluster
+        if(Str.blank(cluster)){
+            throw new SchedulerDataException("Invalid Cluster", Arrays.asList("The cluster is required for indexation"));
+        }
+        
+        // the target filters
+        var filters = new ArrayList<Bson>();
+
+        // filter by cluster
+        filters.add(eq("cluster", cluster));
+        
+        // add tenant filter if given
+        if(!Str.blank(tenant)){
+            filters.add(eq("tenant", tenant));
+        }
+
+        // find all elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get filtered page
+            return this.executions
+                    .find(session, and(filters), ExecutionIndexEntry.class)
+                    .projection(fields(include("_id", "jobId", "status")))
+                    .into(new ArrayList<>());
+        
+        }));
+    }
+    
+    /**
      * Gets the job executions by id
      * 
      * @param id The id of target job execution
@@ -544,6 +655,11 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<JobExecution> getExecutionById(String id) throws SchedulerDataException {
+        // id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Execution ID is required"));
+        }
+        
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return Optional.ofNullable(this.executions.find(session, this.hasId(id)).first());
         }));
@@ -670,7 +786,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
         
         // raise error in case of any issue
         if(!errors.isEmpty()){
-            throw new SchedulerDataException("Cannot update", errors);
+            throw new SchedulerDataException("Invalid Input", errors);
         }
         
         // do within transaction 
@@ -683,9 +799,14 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
             if(execution == null){
                 throw new SchedulerDataException("Missing Execution", Arrays.asList("The target execution is missing"));
             }
+            
+            // when execution is completed we should not allow change of status
+            if(execution.getStatus() == ExecutionStatus.COMPLETED && validInput.getStatus() != ExecutionStatus.COMPLETED){
+                throw new SchedulerDataException("Wrong Status", Arrays.asList("The completed execution cannot be updated"));
+            }
                         
             // the update fields
-            Map updateFields = Map.of("updated", new Date(), "status", validInput.getStatus(), "completionSeverity", validInput.getSeverity());
+            Map updateFields = Map.of("modified", new Date(), "status", validInput.getStatus(), "completionSeverity", validInput.getSeverity());
             
             // the update entity
             var updateEntity = new Document("$set", new Document(updateFields));
@@ -719,6 +840,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<JobExecution> deleteExecutionById(String id) throws SchedulerDataException {
+        
+        // id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Execution ID is required"));
+        }
+        
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             
@@ -744,6 +871,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public long deleteExecutionsByJob(String jobId) throws SchedulerDataException {
+        
+        // id is required
+        if(Str.blank(jobId)){
+            throw new SchedulerDataException("Missing Job Id", Arrays.asList("Job ID is required"));
+        }
+        
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.executions.deleteMany(session, eq("jobId", jobId)).getDeletedCount();
@@ -814,6 +947,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public List<Iteration> getJobIterations(String jobId) throws SchedulerDataException {
+        
+        // job id is required
+        if(Str.blank(jobId)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Job ID is required"));
+        }
+        
         // find all elements with filter
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.iterations.find(session, eq("jobId", jobId)).into(new ArrayList<>());
@@ -829,6 +968,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public List<Iteration> getExecutionIterations(String executionId) throws SchedulerDataException {
+        
+        // execution id is required
+        if(Str.blank(executionId)){
+            throw new SchedulerDataException("Missing Execution Id", Arrays.asList("Execution ID is required"));
+        }
+        
         // find all elements with filter
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.iterations.find(session, eq("executionId", executionId)).into(new ArrayList<>());
@@ -844,6 +989,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<Iteration> getIterationById(String id) throws SchedulerDataException {
+        
+        // id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Iteration ID is required"));
+        }
+        
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return Optional.ofNullable(this.iterations.find(session, this.hasId(id)).first());
         }));
@@ -925,8 +1076,8 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
             validation.add("The execution id is mandatory for iteration");
         }
         
-        // make sure session id is provided
-        if(Str.blank(input.getSession())){
+        // make sure worker id is provided
+        if(Str.blank(input.getWorkerId())){
             validation.add("The session id is mandatory for iteration");
         }
         
@@ -951,7 +1102,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
                     .id(newId)
                     .jobId(input.getJobId())
                     .executionId(input.getExecutionId())
-                    .session(input.getSession())
+                    .workerId(input.getWorkerId())
                     .status(input.getStatus())
                     .message(input.getMessage())
                     .payload(input.getPayload())
@@ -989,6 +1140,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public Optional<Iteration> deleteIterationById(String id) throws SchedulerDataException {
+        
+        // iteration id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Iteration Id", Arrays.asList("Iteration ID is required"));
+        }
+
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             
@@ -1014,6 +1171,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public long deleteJobIterations(String jobId) throws SchedulerDataException {
+        
+        // job id is required
+        if(Str.blank(jobId)){
+            throw new SchedulerDataException("Missing Job Id", Arrays.asList("Job ID is required"));
+        }
+        
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.iterations.deleteMany(session, eq("jobId", jobId)).getDeletedCount();
@@ -1029,6 +1192,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public long deleteExecutionIterations(String executionId) throws SchedulerDataException {
+        
+        // execution id is required
+        if(Str.blank(executionId)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Execution ID is required"));
+        }
+        
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.iterations.deleteMany(session, eq("executionId", executionId)).getDeletedCount();
@@ -1058,6 +1227,12 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
      */
     @Override
     public long deleteIterationsBefore(Date timestamp) throws SchedulerDataException {
+        
+        // timestamp is required
+        if(timestamp == null){
+            throw new SchedulerDataException("Missing Timestamp", Arrays.asList("The timestamp is required"));
+        }
+        
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.iterations.deleteMany(session, lt("timestamp", timestamp)).getDeletedCount();
@@ -1065,13 +1240,13 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
-     * Gets all the worker sessions
+     * Gets all the workers
      * 
-     * @return Returns set of all worker sessions
+     * @return Returns set of all workers
      * @throws SchedulerDataException
      */
     @Override
-    public List<WorkerSession> getAllWorkerSessions() throws SchedulerDataException {
+    public List<Worker> getAllWorkers() throws SchedulerDataException {
         // find all elements with filter
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.workers.find(session, new BsonDocument()).into(new ArrayList<>());
@@ -1079,14 +1254,20 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
-     * Gets the set of worker sessions within a cluster
+     * Gets the set of workers within a cluster
      * 
      * @param cluster The cluster to filter
-     * @return Returns set of cluster worker sessions
+     * @return Returns set of cluster workers
      * @throws SchedulerDataException
      */
     @Override
-    public List<WorkerSession> getAllWorkerSessions(String cluster) throws SchedulerDataException {
+    public List<Worker> getAllWorkers(String cluster) throws SchedulerDataException {
+        
+        // cluster is required
+        if(Str.blank(cluster)){
+            throw new SchedulerDataException("Missing Cluster", Arrays.asList("The cluster value is required"));
+        }
+        
         // find all elements with filter
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return this.workers.find(session, eq("cluster", cluster)).into(new ArrayList<>());
@@ -1094,14 +1275,20 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
-     * Gets the worker session by identifier
+     * Gets the worker by identifier
      * 
      * @param id The agent definition id
      * @return Returns agent definition if found
      * @throws SchedulerDataException
      */
     @Override
-    public Optional<WorkerSession> getWorkerSessionById(String id) throws SchedulerDataException {
+    public Optional<Worker> getWorkerById(String id) throws SchedulerDataException {
+        
+        // id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Worker ID is required"));
+        }
+        
         // find all elements with filter
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             return Optional.ofNullable(this.workers.find(session, this.hasId(id)).first());
@@ -1109,14 +1296,14 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
-     * Inserts a agent definition into the data store
+     * Inserts a worker into the data store
      * 
-     * @param input The worker session input
-     * @return Returns saved agent definition
+     * @param input The worker input
+     * @return Returns saved worker
      * @throws SchedulerDataException
      */
     @Override
-    public WorkerSession insertWorkerSession(WorkerSessionInput input) throws SchedulerDataException {
+    public Worker insertWorker(WorkerInput input) throws SchedulerDataException {
         
         // validation log
         var validation = new ArrayList<String>();
@@ -1150,8 +1337,8 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
             
-            // build new session to save
-            var worker = WorkerSession.builder()
+            // build new worker to save
+            var worker = Worker.builder()
                     .id(newId)
                     .cluster(input.getCluster())
                     .worker(input.getWorker())
@@ -1168,7 +1355,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
             
             // could not insert
             if(inserted.getInsertedId() == null){
-                throw new SchedulerDataException("Worker Session Not Saved", Arrays.asList("The worker session was not saved"));
+                throw new SchedulerDataException("Worker Not Saved", Arrays.asList("The worker was not saved"));
             }
             
             // get saved object if available
@@ -1176,7 +1363,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
             
             // something went wrong and saved entity is missing
             if(savedOne == null){
-                throw new SchedulerDataException("Worker Session Missing", Arrays.asList("The worker session was not saved"));
+                throw new SchedulerDataException("Worker Missing", Arrays.asList("The worker was not saved"));
             }
             
             // return inserted
@@ -1185,19 +1372,22 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
-     * Updates a agent definition in the data store
+     * Updates a worker in the data store
      * 
      * @param id The id of worker session
-     * @param activity The activity to modify
-     * @return Returns saved worker session
+     * @param heartbeat The heartbeat to update
+     * @return Returns saved worker 
      * @throws SchedulerDataException
      */
     @Override
-    public WorkerSession updateWorkerSession(String id, WorkerActivity activity) throws SchedulerDataException {
+    public Worker updateWorker(String id, WorkerHeartbeat heartbeat) throws SchedulerDataException {
         // raise error in case of any issue
         if(Str.blank(id)){
-            throw new SchedulerDataException("Cannot update", Arrays.asList("Missing session identifier"));
+            throw new SchedulerDataException("Cannot update", Arrays.asList("Missing worker identifier"));
         }
+        
+        // the target activity to update (heartbeat by default)
+        var activity = heartbeat.getActivity() == null ? WorkerActivity.HEARTBEAT : heartbeat.getActivity();
         
         // do within transaction 
         return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
@@ -1211,7 +1401,7 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
             }
                         
             // the update fields
-            Map updateFields = Map.of("updated", new Date(), "activity", activity != null ? activity : WorkerActivity.HEARTBEAT);
+            Map updateFields = Map.of("updated", new Date(), "activity", activity.name());
             
             // the update entity
             var updateEntity = new Document("$set", new Document(updateFields));
@@ -1237,33 +1427,111 @@ public class SchedulerMongoRepisotory implements SchedulerRepository {
     }
     
     /**
-     * Deletes all the idle sessions for the given cluster and machine
+     * Deletes all the idle workers for the given cluster and machine
      * 
      * @param cluster The cluster to filter
      * @param name The name of machine to remove
      * @return Returns number of deleted sessions
      * @throws SchedulerDataException
      */
-    public long deleteIdleWorkerSessions(String cluster, String name) throws SchedulerDataException;
+    @Override
+    public long deleteIdleWorkers(String cluster, String name) throws SchedulerDataException {
     
+        // all matchin criterias
+        var filters = new ArrayList<Bson>();
+        
+        // match by cluster if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("cluster", cluster));
+        }
+        
+        // match by name if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("name", name));
+        }
+        
+        // the query will check if last update time + max idle is less than given time
+        var idleQueryTemplate = "{\"$lt\": [{\"$add\": [\"$updated\", \"$maxIdle\"]}, ISODate(\"%s\")]}"; 
+        
+        try {
+            // the idle filter
+            var idleFilter = Document.parse(String.format(idleQueryTemplate, new Date().toInstant().toString()));
+
+            // add idle filter in any case
+            filters.add(expr(idleFilter));
+        }
+        catch(Throwable e){
+            throw new SchedulerDataException("Wrong Query", Arrays.asList("The idle worker query is incorrect"), e);
+        }
+        
+        // delete elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.workers.deleteMany(session, and(filters)).getDeletedCount();
+        }));
+    }
     /**
-     * Deletes all the sessions for the given cluster and machine
+     * Deletes all the workers for the given cluster and machine
      * 
      * @param cluster The cluster to filter
      * @param name The name of machine to remove
      * @return Returns number of deleted sessions
      * @throws SchedulerDataException
      */
-    public long deleteWorkerSessions(String cluster, String name) throws SchedulerDataException;
+    @Override
+    public long deleteWorkers(String cluster, String name) throws SchedulerDataException {
+        
+        // all matchin criterias
+        var filters = new ArrayList<Bson>();
+        
+        // match by cluster if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("cluster", cluster));
+        }
+        
+        // match by name if given
+        if(!Str.blank(cluster)){
+            filters.add(eq("name", name));
+        }
+        
+        // combined filter
+        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
+        
+         // delete elements with filter
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            return this.workers.deleteMany(session, combined).getDeletedCount();
+        }));
+    }
        
     /**
      * Deletes an entry by id and returns deleted one
      * 
-     * @param id The id of agent definition to delete
-     * @return Returns deleted agent definition item
+     * @param id The id of worker to delete
+     * @return Returns deleted worker item
      * @throws SchedulerDataException
      */
-    public Optional<WorkerSession> deleteWorkerSessionById(String id) throws SchedulerDataException;
+    @Override
+    public Optional<Worker> deleteWorkerById(String id) throws SchedulerDataException {
+        
+        // iteration id is required
+        if(Str.blank(id)){
+            throw new SchedulerDataException("Missing Worker Id", Arrays.asList("Worker ID is required"));
+        }
+
+        // do within transaction 
+        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+            
+            // get existing item by id
+            var existing = this.workers.find(session, this.hasId(id)).first();
+            
+            // delete if exists
+            if(existing != null) {
+                // delete single entity
+                this.workers.deleteOne(session, this.hasId(id));
+            }
+            
+            return Optional.ofNullable(existing);
+        }));
+    }
     
     /**
      * Builds the collection name

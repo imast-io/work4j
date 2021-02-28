@@ -4,7 +4,6 @@ import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
-import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.WorkerFactory;
 import io.vavr.control.Try;
@@ -159,15 +158,5 @@ public class JobOps {
         }
         
         return supplier;
-    }
-    
-    /**
-     * Build a identity for the job definition 
-     * 
-     * @param definition The job definition
-     * @return Returns an identity key for job definition
-     */
-    public static String identity(JobDefinition definition){
-        return String.format("%s:%s", definition.getCode(), definition.getGroup());
     }
 }

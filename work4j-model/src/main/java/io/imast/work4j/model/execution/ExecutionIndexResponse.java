@@ -1,6 +1,7 @@
 package io.imast.work4j.model.execution;
 
 import java.util.List;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 
@@ -10,19 +11,10 @@ import lombok.Data;
  * @author davitp
  */
 @Data
+@AllArgsConstructor
 @Builder(toBuilder = true)
 public class ExecutionIndexResponse {
-    
-    /**
-     * The target cluster
-     */
-    private String cluster;
-    
-    /**
-     * The target tenant
-     */
-    private String tenant;    
-    
+        
     /**
      * The set of execution index entries
      */

@@ -27,13 +27,33 @@ public class QuartzExecutorContext implements JobExecutorContext {
     }
     
     /**
+     * Get job execution id
+     * 
+     * @return Returns job execution id
+     */
+    @Override
+    public String getExecutionId(){
+        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXEC_ID);
+    }
+    
+    /**
+     * Get job definition id
+     * 
+     * @return Returns job definition id
+     */
+    @Override
+    public String getDefinitionId(){
+        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_DEFINITION_ID);
+    }
+    
+    /**
      * Get job code
      * 
      * @return Returns job code
      */
     @Override
-    public String getCode(){
-        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_CODE);
+    public String getName(){
+        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_NAME);
     }
     
     /**
@@ -42,7 +62,7 @@ public class QuartzExecutorContext implements JobExecutorContext {
      * @return Returns job group
      */
     @Override
-    public String getGroup(){        
+    public String getFolder(){        
         return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_FOLDER);
     }
     

@@ -5,16 +5,16 @@ import lombok.Builder;
 import lombok.Data;
 
 /**
- * The worker session information
+ * The worker information
  * 
  * @author davitp
  */
 @Data
 @Builder(toBuilder = true)
-public class WorkerSession {
+public class Worker {
     
     /**
-     * The session identifier
+     * The worker identifier
      */
     private String id;
     

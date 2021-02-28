@@ -20,9 +20,9 @@ public enum CompletionSeverity implements Serializable {
     WARNING,
     
     /**
-     * The completion is not complete (for example, due to cancellation)
+     * The cancellation severity in case of manual interrupt
      */
-    INCOMPLETE,
+    CANCELLATION,
     
     /**
      * The indication of unsuccessful completion

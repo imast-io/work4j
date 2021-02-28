@@ -1,7 +1,7 @@
 package io.imast.work4j.worker.instance;
 
 import io.imast.work4j.channel.SchedulerChannel;
-import io.imast.work4j.model.JobStatus;
+import io.imast.work4j.model.execution.CompletionSeverity;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.JobDetail;
 import org.quartz.JobKey;
@@ -58,13 +58,9 @@ public class JobSchedulerListener implements SchedulerListener {
     @Override
     public void triggerFinalized(Trigger trigger) {
         
-        // update job and get result back
-        var result = this.schedulerChannel.markAs(trigger.getJobKey().getName(), JobStatus.COMPLETED);
-    
-        // check if result is success
-        if(!result.isPresent()){
-            log.error("JobSchedulerListener: Job completion is not updated.");
-        }
+        // update job and get 
+        // FIXME
+        this.schedulerChannel.complete(trigger.getJobKey().getName(), CompletionSeverity.SUCCESS).subscribe();
     }
 
     /**

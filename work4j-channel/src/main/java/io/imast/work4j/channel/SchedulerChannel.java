@@ -1,10 +1,16 @@
 package io.imast.work4j.channel;
 
-import java.util.Optional;
-import io.imast.work4j.model.*;
-import io.imast.work4j.model.agent.*;
 import io.imast.work4j.model.iterate.*;
-import io.imast.work4j.model.exchange.*;
+import io.imast.work4j.model.execution.CompletionSeverity;
+import io.imast.work4j.model.execution.ExecutionIndexRequest;
+import io.imast.work4j.model.execution.ExecutionIndexResponse;
+import io.imast.work4j.model.execution.ExecutionsRequest;
+import io.imast.work4j.model.execution.ExecutionsResponse;
+import io.imast.work4j.model.execution.JobExecution;
+import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.worker.WorkerHeartbeat;
+import io.imast.work4j.model.worker.WorkerInput;
+import reactor.core.publisher.Mono;
 
 /**
  * The worker channel interface 
@@ -16,18 +22,27 @@ public interface SchedulerChannel {
     /**
      * Pull job groups for the given cluster
      * 
-     * @param request The job group request filter
-     * @return Returns job group identities
+     * @param request The request structure of executions
+     * @return Returns execution index entries
      */
-    public Optional<JobMetadataResponse> metadata(JobMetadataRequest request);
+    public Mono<ExecutionIndexResponse> executionIndex(ExecutionIndexRequest request);
     
     /**
      * Exchange current status with modified entries
      * 
-     * @param status The status exchange structure
-     * @return Returns modified entries
+     * @param request The executions request 
+     * @return Returns executions response
      */
-    public Optional<JobStatusExchangeResponse> statusExchange(JobStatusExchangeRequest status);
+    public Mono<ExecutionsResponse> executions(ExecutionsRequest request);
+    
+    /**
+     * Completes the job execution in scheduler
+     * 
+     * @param id The identifier of job execution
+     * @param severity The severity of completion
+     * @return Returns updated job execution
+     */
+    public Mono<JobExecution> complete(String id, CompletionSeverity severity);
     
     /**
      * Adds iteration information to scheduler
@@ -35,31 +50,22 @@ public interface SchedulerChannel {
      * @param iteration The iteration to register
      * @return Returns registered iteration
      */
-    public Optional<JobIteration> iterate(JobIteration iteration);
+    public Mono<Iteration> iterate(IterationInput iteration);
     
     /**
-     * Sets the status of job definition 
+     * Registers worker into the scheduler
      * 
-     * @param id The identifier of job definition
-     * @param status The new status of job
-     * @return Returns updated job definition
+     * @param input The worker input to register
+     * @return Returns registered worker
      */
-    public Optional<JobDefinition> markAs(String id, JobStatus status);
+    public Mono<Worker> registration(WorkerInput input);
     
     /**
-     * Registers agent definition into the system 
+     * Send a Heartbeat signal to from worker scheduler
      * 
-     * @param agent The agent definition to register
-     * @return Returns registered agent definition
-     */
-    public Optional<AgentDefinition> registration(AgentDefinition agent);
-    
-    /**
-     * Send a Heartbeat signal to scheduler
-     * 
-     * @param id The identifier of agent definition
-     * @param health The health status of agent
+     * @param id The identifier of worker instance
+     * @param heartbeat The worker reported heartbeat
      * @return Returns updated agent definition
      */
-    public Optional<AgentDefinition> heartbeat(String id, AgentHealth health);
+    public Mono<Worker> heartbeat(String id, WorkerHeartbeat heartbeat);
 }
