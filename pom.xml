@@ -39,7 +39,7 @@
     </modules>
 	
     <properties>
-        <revision>0.0.1.RC1</revision>
+        <revision>0.0.1.RC2</revision>
 		
         <java.version>11</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

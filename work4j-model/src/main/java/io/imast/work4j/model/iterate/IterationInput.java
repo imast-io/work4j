@@ -25,9 +25,9 @@ public class IterationInput {
     private String executionId;
     
     /**
-     * The session the iteration was executed in
+     * The worker the iteration was executed in
      */
-    private String session;
+    private String workerId;
     
     /**
      * The status of performed iteration 

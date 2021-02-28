@@ -4,6 +4,7 @@ import io.imast.work4j.data.exception.SchedulerDataException;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobDefinitionInput;
 import io.imast.work4j.model.JobRequestResult;
+import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionStatus;
 import io.imast.work4j.model.execution.ExecutionUpdateInput;
 import io.imast.work4j.model.execution.ExecutionsResponse;
@@ -13,9 +14,9 @@ import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.IterationsResponse;
-import io.imast.work4j.model.worker.WorkerActivity;
-import io.imast.work4j.model.worker.WorkerSession;
-import io.imast.work4j.model.worker.WorkerSessionInput;
+import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.worker.WorkerHeartbeat;
+import io.imast.work4j.model.worker.WorkerInput;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -25,7 +26,7 @@ import java.util.Optional;
  * 
  * @author davitp
  */
-public interface SchedulerRepository {
+public interface SchedulerDataRepository {
     
     /**
      * Ensures that schema is ready for data operations
@@ -135,6 +136,15 @@ public interface SchedulerRepository {
     public List<JobExecution> getExecutionsByJob(String jobId) throws SchedulerDataException;
     
     /**
+     * Gets all the job executions by given ids
+     * 
+     * @param ids The set of ids
+     * @return Returns set of all job executions
+     * @throws SchedulerDataException
+     */
+    public List<JobExecution> getExecutionsByIds(List<String> ids) throws SchedulerDataException;
+    
+    /**
      * Gets the page of executions in the system
      * 
      * @param tenant The tenant to filter
@@ -146,6 +156,15 @@ public interface SchedulerRepository {
      * @throws SchedulerDataException
      */
     public ExecutionsResponse getExecutionsPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException;
+    
+    /**
+     * Gets the set of execution index entries based on query
+     * 
+     * @param tenant The tenant to filter
+     * @param cluster The cluster to filter
+     * @return Returns set of execution entries
+     */
+    public List<ExecutionIndexEntry> getExecutionIndex(String tenant, String cluster) throws SchedulerDataException;
     
     /**
      * Gets the job executions by id
@@ -314,47 +333,47 @@ public interface SchedulerRepository {
     /**
      * Gets all the worker sessions
      * 
-     * @return Returns set of all worker sessions
+     * @return Returns set of all workers
      * @throws SchedulerDataException
      */
-    public List<WorkerSession> getAllWorkerSessions() throws SchedulerDataException;
+    public List<Worker> getAllWorkers() throws SchedulerDataException;
     
     /**
      * Gets the set of worker sessions within a cluster
      * 
      * @param cluster The cluster to filter
-     * @return Returns set of cluster worker sessions
+     * @return Returns set of cluster workers
      * @throws SchedulerDataException
      */
-    public List<WorkerSession> getAllWorkerSessions(String cluster) throws SchedulerDataException;
+    public List<Worker> getAllWorkers(String cluster) throws SchedulerDataException;
     
     /**
-     * Gets the worker session by identifier
+     * Gets the worker by identifier
      * 
      * @param id The agent definition id
-     * @return Returns agent definition if found
+     * @return Returns worker if found
      * @throws SchedulerDataException
      */
-    public Optional<WorkerSession> getWorkerSessionById(String id) throws SchedulerDataException;
+    public Optional<Worker> getWorkerById(String id) throws SchedulerDataException;
     
     /**
-     * Inserts a agent definition into the data store
+     * Inserts a worker into the data store
      * 
-     * @param input The session to insert
-     * @return Returns saved worker session
+     * @param input The worker to insert
+     * @return Returns saved worker 
      * @throws SchedulerDataException
      */
-    public WorkerSession insertWorkerSession(WorkerSessionInput input) throws SchedulerDataException;
+    public Worker insertWorker(WorkerInput input) throws SchedulerDataException;
     
     /**
-     * Updates a agent definition in the data store
+     * Updates a worker in the data store
      * 
-     * @param id The id of worker session
-     * @param activity The activity to modify
-     * @return Returns saved worker session
+     * @param id The id of worker 
+     * @param heartbeat The heartbeat to update
+     * @return Returns saved worker 
      * @throws SchedulerDataException
      */
-    public WorkerSession updateWorkerSession(String id, WorkerActivity activity) throws SchedulerDataException;
+    public Worker updateWorker(String id, WorkerHeartbeat heartbeat) throws SchedulerDataException;
     
     /**
      * Deletes all the idle sessions for the given cluster and machine
@@ -364,7 +383,7 @@ public interface SchedulerRepository {
      * @return Returns number of deleted sessions
      * @throws SchedulerDataException
      */
-    public long deleteIdleWorkerSessions(String cluster, String name) throws SchedulerDataException;
+    public long deleteIdleWorkers(String cluster, String name) throws SchedulerDataException;
     
     /**
      * Deletes all the sessions for the given cluster and machine
@@ -374,7 +393,7 @@ public interface SchedulerRepository {
      * @return Returns number of deleted sessions
      * @throws SchedulerDataException
      */
-    public long deleteWorkerSessions(String cluster, String name) throws SchedulerDataException;
+    public long deleteWorkers(String cluster, String name) throws SchedulerDataException;
        
     /**
      * Deletes an entry by id and returns deleted one
@@ -383,5 +402,5 @@ public interface SchedulerRepository {
      * @return Returns deleted agent definition item
      * @throws SchedulerDataException
      */
-    public Optional<WorkerSession> deleteWorkerSessionById(String id) throws SchedulerDataException;
+    public Optional<Worker> deleteWorkerById(String id) throws SchedulerDataException;
 }

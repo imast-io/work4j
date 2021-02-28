@@ -20,11 +20,6 @@ public enum ExecutionStatus implements Serializable {
     PAUSED,
     
     /**
-     * The job execution is cancelled
-     */
-    CANCELLED,
-    
-    /**
      * Job is completed and has no more things to do
      */
     COMPLETED

@@ -1,10 +1,9 @@
 package io.imast.work4j.worker.instance;
 
 import io.imast.core.Lang;
-import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.JobOptions;
-import io.imast.work4j.model.iterate.Iteration;
+import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.job.JobOps;
@@ -73,20 +72,17 @@ public class EveryJobListener implements JobListener {
     @Override
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 
-        // the job id
-        var executionId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_ID);
+        // the job execution id
+        var executionId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXEC_ID);
         
-        // get the name
-        var name = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_NAME);
-        
-        // get the folder
-        var folder = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_FOLDER);
-        
+        // the job definition id
+        var jobId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_DEFINITION_ID);
+                
         // the job status
         var status = jobException == null ? IterationStatus.SUCCESS : IterationStatus.FAILURE;
         
         // get execution options
-        var options = JobOps.<JobOptions>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXECUTION);
+        var options = JobOps.<JobOptions>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_OPTIONS);
         
         // if silent reporting 
         var silent = options != null && options.isSilentIterations();
@@ -103,9 +99,10 @@ public class EveryJobListener implements JobListener {
         var runtime = context.getJobRunTime();
         
         // create iteration entity
-        var iteration = Iteration.builder()
-                .id(null)
-                .executionId(instanceId)
+        var iteration = IterationInput.builder()
+                .executionId(executionId)
+                .jobId(jobId)
+                .workerId("FIXME")
                 .runtime(runtime)
                 .status(status)
                 .payload(Lang.safeCast(output))
@@ -114,10 +111,6 @@ public class EveryJobListener implements JobListener {
                 .build();
         
         // register iteration and get the result
-        var result = this.schedulerChannel.iterate(iteration);
-        
-        if(!result.isPresent()){
-            log.warn(String.format("EveryJobListener: Could not register %s iteration for job %s (%s)", iteration.getStatus(), name, folder));
-        }
+        this.schedulerChannel.iterate(iteration).subscribe();
     }    
 }

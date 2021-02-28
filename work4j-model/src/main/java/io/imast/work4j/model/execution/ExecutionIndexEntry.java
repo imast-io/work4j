@@ -13,14 +13,14 @@ import lombok.Data;
 public class ExecutionIndexEntry {
     
     /**
+     * The execution id
+     */
+    private String id;
+    
+    /**
      * The job identifier
      */
     private String jobId;
-    
-    /**
-     * The execution id
-     */
-    private String executionId;
     
     /**
      * The execution status
