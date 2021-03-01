@@ -1,29 +1,31 @@
 package io.imast.work4j.worker.controller;
 
-import io.imast.core.Coll;
-import io.imast.core.Lang;
-import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.channel.worker.WorkerExecutionCompleted;
+import io.imast.work4j.channel.worker.WorkerExecutionCreated;
+import io.imast.work4j.channel.worker.WorkerExecutionPaused;
+import io.imast.work4j.channel.worker.WorkerExecutionResumed;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.channel.worker.WorkerMessage;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionIndexRequest;
+import io.imast.work4j.model.execution.ExecutionStatus;
+import io.imast.work4j.model.execution.ExecutionsRequest;
 import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
-import io.vavr.control.Try;
+import io.imast.work4j.worker.instance.ExecutionKey;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import reactor.core.Disposable;
 
 /**
  * The polling based worker listener
@@ -64,6 +66,11 @@ public class PollingWorkerListener implements WorkerListener {
     protected final LinkedList<Consumer<WorkerMessage>> consumers;
     
     /**
+     * The execution chunk size to load once
+     */
+    protected final int executionChunkSize;
+    
+    /**
      * The scheduler channel
      * 
      * @param worker The worker instance
@@ -78,6 +85,7 @@ public class PollingWorkerListener implements WorkerListener {
         this.config = config;
         this.asyncExecutor = Executors.newScheduledThreadPool(1);
         this.consumers = new LinkedList<>();
+        this.executionChunkSize = 100;
     }
     
     /**
@@ -157,46 +165,11 @@ public class PollingWorkerListener implements WorkerListener {
     }
     
     /**
-     * Sync with controller for group and type pair
-     * 
-     * @param group The target group
-     * @param type The target type
-     * @throws io.imast.work4j.worker.WorkerException
-     */
-    protected void syncGroupImpl(String group, String type) throws WorkerException{
-        
-        // get job list
-        var statusUpdate = this.channel.statusExchange(this.instance.getStatus(group, type)).orElse(null);
-
-        // handle if not recieved jobs
-        if(statusUpdate == null){
-            throw new WorkerException("PollingSupervisor: Did not get proper response from scheduler.");
-        }
-
-        log.debug(String.format("PollingSupervisor: Syncing jobs in %s with server. Deleted: %s, Updated: %s, Added: %s", group, statusUpdate.getRemoved().size(), statusUpdate.getUpdated().size(), statusUpdate.getAdded().size()));
-
-        // unschedule all the removed jobs
-        statusUpdate.getRemoved().forEach((removedJob) -> {
-            this.raise(new WorkerUpdateMessage(UpdateOperation.REMOVE, removedJob, statusUpdate.getGroup(), null));
-        });
-
-        // schedule added jobs
-        statusUpdate.getAdded().values().forEach(job -> {
-            this.raise(new WorkerUpdateMessage(UpdateOperation.ADD, job.getCode(), job.getGroup(), job));
-        });
-        
-        // schedule updated jobs
-        statusUpdate.getUpdated().values().forEach(job -> {
-            this.raise(new WorkerUpdateMessage(UpdateOperation.UPDATE, job.getCode(), job.getGroup(), job));
-        });
-    }
-    
-    /**
      * Raise update message
      * 
      * @param message The message to raise
      */
-    protected void raise(WorkerUpdateMessage message){
+    protected void raise(WorkerMessage message){
         this.consumers.forEach(consumer -> consumer.accept(message));
     }
 
@@ -214,7 +187,10 @@ public class PollingWorkerListener implements WorkerListener {
         }
 
         // build map out of index entries
-        var index = entries.stream().collect(Collectors.toMap(e -> e.getId(), e -> e));
+        var index = entries.stream().collect(Collectors.toMap(e -> new ExecutionKey(e.getId(), e.getJobId()), e -> e));
+        
+        // the keys of index
+        var indexKeys = index.keySet();
         
         // the set of paused jobs
         var paused = this.instance.getPausedExecutions();
@@ -222,7 +198,113 @@ public class PollingWorkerListener implements WorkerListener {
         // the set of executions
         var all = this.instance.getExecutions();
         
+        // missing execution keys 
+        var toAdd = new HashSet<ExecutionKey>();
         
+        // collect all entities that needs to be deleted
+        var toDelete = new HashSet<ExecutionKey>();
         
+        // entries to pause
+        var toPause = new HashSet<ExecutionKey>();
+        
+        // entries to resume
+        var toResume = new HashSet<ExecutionKey>();
+        
+        // check all the index entries
+        indexKeys.forEach(idx -> {
+        
+            // if any item is in index but not running/paused currently then consider missing
+            if(!all.contains(idx)){
+                toAdd.add(idx);
+                return;
+            }
+            
+            // get the entry
+            var entry = index.get(idx);
+            
+            // item is completed need to remove
+            if(entry.getStatus() == ExecutionStatus.COMPLETED){
+                toDelete.add(idx);
+                return;
+            }
+            
+            // if index says entry should be paused but its not paused do it
+            if(entry.getStatus() == ExecutionStatus.PAUSED && !paused.contains(idx)){
+                toPause.add(idx);
+                return;
+            }
+            
+            // if index says entry should be active but its paused, activate it
+            if(entry.getStatus() == ExecutionStatus.ACTIVE && paused.contains(idx)){
+                toResume.add(idx);
+            }
+        });
+        
+        // check all currently existing items
+        all.forEach(existing -> {
+        
+            // if entry is running but index does not contain info about it delete
+            if(!index.containsKey(existing)){
+                toDelete.add(existing);
+            } 
+        });
+        
+        log.info(String.format("PollingWorkerListener: Current: Index(%s), All(%s), Paused(%s)", index.size(), all.size(), paused.size()));
+        
+        // if there is nothing to do as per change comparison
+        if(toAdd.size() + toDelete.size() + toPause.size() + toResume.size() == 0){
+            return;
+        }
+        
+        log.info(String.format("PollingWorkerListener: Changes: Add(%s), Delete(%s), Pause(%s), Resume(%s)", toAdd.size(), toDelete.size(), toPause.size(), toResume.size()));
+
+        // raise completed events
+        toDelete.forEach(key -> this.raise(new WorkerExecutionCompleted(key.getExecutionId(), key.getJobId())));
+        
+        // raise pause events
+        toPause.forEach(key -> this.raise(new WorkerExecutionPaused(key.getExecutionId(), key.getJobId())));
+        
+        // raise resume events
+        toResume.forEach(key -> this.raise(new WorkerExecutionResumed(key.getExecutionId(), key.getJobId())));
+        
+        // the portions of jobs to load
+        var portions = new ArrayList<ArrayList<String>>();
+        
+        // first portion
+        portions.add(new ArrayList<>());
+        
+        // for each adding item break into its portion
+        toAdd.forEach(key -> {
+            
+            // add a portion if previous is full
+            if(portions.get(portions.size() - 1).size() >= this.executionChunkSize){
+                portions.add(new ArrayList<>());
+            }
+            
+            // insert into last portion
+            portions.get(portions.size() - 1).add(key.getExecutionId());
+        });
+        
+        // load missing elements for each portion
+        portions.forEach(portion -> {
+            
+            // load portion
+            var load = this.channel.executions(ExecutionsRequest.builder().executions(portion).build());
+            
+            // on completion generate all required messages
+            load.subscribe(
+                response -> {
+                    
+                    // nothing to do, no result
+                    if(response == null || response.getExecutions() == null){
+                        return;
+                    }
+                    
+                    response.getExecutions().forEach(exec -> this.raise(new WorkerExecutionCreated(exec)));
+                    
+                }, 
+                error ->  log.error("PollingListener: Could not load portion of executions", error)
+            );
+        });
     }
 }

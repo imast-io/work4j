@@ -85,9 +85,17 @@ public interface JobExecutorContext {
     public <T> T getValue(String key, T defaultValue);
     
     /**
-     * Sets the output payload
+     * Puts the value into output
      * 
-     * @param payload The output payload
+     * @param key The output entry key
+     * @param value The output entry value
      */
-    public void setOutput(Map<String, Object> payload);
+    public void putOutput(String key, Object value);
+    
+    /**
+     * Puts the value into output
+     * 
+     * @param other The other values
+     */
+    public void putOutput(Map<String, Object> other);
 }

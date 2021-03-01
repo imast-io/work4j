@@ -137,9 +137,12 @@ public class QuartzInstance {
      * @return Returns group names
      * @throws io.imast.work4j.worker.WorkerException
      */
-    public Set<String> getExecutions() throws WorkerException{
+    public Set<ExecutionKey> getExecutions() throws WorkerException{
         try { 
-            return this.scheduler.getJobKeys(GroupMatcher.anyJobGroup()).stream().map(key -> key.getName()).collect(Collectors.toSet());
+            return this.scheduler.getJobKeys(GroupMatcher.anyJobGroup())
+                    .stream()
+                    .map(key -> new ExecutionKey(key.getName(), key.getGroup()))
+                    .collect(Collectors.toSet());
         }
         catch(SchedulerException ex){
             throw new WorkerException("Unable to read job execution keys", ex);
@@ -152,10 +155,13 @@ public class QuartzInstance {
      * @return Returns the paused executions
      * @throws WorkerException 
      */
-    public Set<String> getPausedExecutions() throws WorkerException {
+    public Set<ExecutionKey> getPausedExecutions() throws WorkerException {
     
         try {
-            return this.scheduler.getPausedTriggerGroups();
+            return this.scheduler.getPausedTriggerGroups()
+                    .stream()
+                    .map(ExecutionKey::from)
+                    .collect(Collectors.toSet());
         }
         catch(SchedulerException ex){
             throw new WorkerException("Unable to read paused job execution keys (trigger groups)", ex);

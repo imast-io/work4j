@@ -1,12 +1,18 @@
 package io.imast.work4j.worker.controller;
 
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.channel.worker.WorkerExecutionCompleted;
+import io.imast.work4j.channel.worker.WorkerExecutionCreated;
+import io.imast.work4j.channel.worker.WorkerExecutionPaused;
+import io.imast.work4j.channel.worker.WorkerListener;
+import io.imast.work4j.channel.worker.WorkerMessage;
 import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.model.worker.WorkerActivity;
 import io.imast.work4j.model.worker.WorkerHeartbeat;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
+import io.imast.work4j.worker.instance.ExecutionKey;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -30,9 +36,9 @@ public class WorkerController {
     protected SchedulerChannel channel;
 
     /**
-     * The supervisors
+     * The listeners
      */
-    private final List<WorkerSupervior> supervisors;
+    private final List<WorkerListener> listeners;
     
     /**
      * The worker configuration
@@ -55,14 +61,14 @@ public class WorkerController {
      * @param worker The worker instance
      * @param instance The quartz instance
      * @param channel The channel
-     * @param supervisors The worker supervisors
+     * @param listeners The worker listeners
      * @param config The worker configuration
      */
-    public WorkerController(Worker worker, QuartzInstance instance, SchedulerChannel channel, List<WorkerSupervior> supervisors, WorkerConfiguration config){
+    public WorkerController(Worker worker, QuartzInstance instance, SchedulerChannel channel, List<WorkerListener> listeners, WorkerConfiguration config){
         this.worker = worker;
         this.instance = instance;
         this.channel = channel;
-        this.supervisors = supervisors;
+        this.listeners = listeners;
         this.config = config;
         this.asyncExecutor = Executors.newScheduledThreadPool(1);
     }
@@ -75,13 +81,13 @@ public class WorkerController {
           
         this.instance.start();
         
-        // subscribe to all supervisors
-        this.supervisors.forEach(supervisor -> {
+        // subscribe to all listeners
+        this.listeners.forEach(listener -> {
             // register listner function
-            supervisor.add(this::recieved);
+            listener.add(this::recieved);
 
             // start listening
-            supervisor.start();
+            listener.start();
         });
         
         // if worker signal period is not given do not send heartbeats
@@ -101,13 +107,13 @@ public class WorkerController {
         
         this.instance.stop();
         
-        // subscribe to all supervisors
-        this.supervisors.forEach(supervisor -> {
+        // subscribe to all listeners
+        this.listeners.forEach(listener -> {
             // stop listening
-            supervisor.stop();
+            listener.stop();
             
             // remove listner function
-            supervisor.remove(this::recieved);            
+            listener.remove(this::recieved);            
         });
         
         // shutdown all async tasks
@@ -119,21 +125,46 @@ public class WorkerController {
      * 
      * @param message The message to process 
      */
-    protected void recieved(WorkerUpdateMessage message){
-        
-        // handle add operation
-        if(message.getOperation() == UpdateOperation.ADD){
-            this.instance.schedule(message.getDefinition());
+    protected void recieved(WorkerMessage message){
+       
+        // an execution is created so needs to be scheduled
+        if(message instanceof WorkerExecutionCreated){
+            
+            // cast to concrete type
+            var msg = (WorkerExecutionCreated) message;
+            
+            // schedule
+            this.instance.schedule(msg.getExecution());
         }
         
-        // handle update operation
-        if(message.getOperation() == UpdateOperation.UPDATE){
-            this.instance.reschedule(message.getDefinition());
+        // an execution is completed so needs to be unscheduled
+        if(message instanceof WorkerExecutionCompleted){
+            
+            // cast to concrete type
+            var msg = (WorkerExecutionCompleted) message;
+            
+            // unschedule
+            this.instance.unschedule(new ExecutionKey(msg.getExecutionId(), msg.getJobId()));
         }
         
-        // handle remove operation
-        if(message.getOperation() == UpdateOperation.REMOVE){
-            this.instance.unschedule(message.getCode(), message.getGroup());
+        // an execution is paused so needs to be paused in scheduler instance
+        if(message instanceof WorkerExecutionPaused){
+            
+            // cast to concrete type
+            var msg = (WorkerExecutionPaused) message;
+            
+            // pause
+            this.instance.pause(new ExecutionKey(msg.getExecutionId(), msg.getJobId()));
+        }
+       
+        // an execution is resumed so needs to be resumed in scheduler instance
+        if(message instanceof WorkerExecutionPaused){
+            
+            // cast to concrete type
+            var msg = (WorkerExecutionPaused) message;
+            
+            // pause
+            this.instance.resume(new ExecutionKey(msg.getExecutionId(), msg.getJobId()));
         }
     }
    
@@ -143,6 +174,6 @@ public class WorkerController {
     protected void heartbeat() {
                 
         // report new health info
-        this.channel.heartbeat(this.worker.getId(), WorkerHeartbeat.builder().activity(WorkerActivity.HEARTBEAT).build());
+        this.channel.heartbeat(this.worker.getId(), WorkerHeartbeat.builder().activity(WorkerActivity.HEARTBEAT).build()).subscribe();
     }
 }
