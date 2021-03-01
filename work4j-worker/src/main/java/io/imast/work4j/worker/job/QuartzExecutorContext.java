@@ -2,6 +2,7 @@ package io.imast.work4j.worker.job;
 
 import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.worker.JobConstants;
+import java.util.HashMap;
 import java.util.Map;
 import org.quartz.JobExecutionContext;
 
@@ -129,12 +130,33 @@ public class QuartzExecutorContext implements JobExecutorContext {
     }
     
     /**
-     * Sets the output payload
+     * Puts the value into output
      * 
-     * @param payload The output payload
+     * @param key The output entry key
+     * @param value The output entry value
      */
     @Override
-    public void setOutput(Map<String, Object> payload){
-        this.context.setResult(payload);
+    public void putOutput(String key, Object value){
+        
+        if(this.context.getResult() == null){
+            this.context.setResult(new HashMap<String, Object>());
+        }
+        
+        ((Map<String, Object>)this.context.getResult()).put(key, value);
+    }
+    
+    /**
+     * Puts the value into output
+     * 
+     * @param other The other values
+     */
+    @Override
+    public void putOutput(Map<String, Object> other){
+        
+        if(this.context.getResult() == null){
+            this.context.setResult(new HashMap<String, Object>());
+        }
+        
+        ((Map<String, Object>)this.context.getResult()).putAll(other);
     }
 }

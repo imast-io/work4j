@@ -2,8 +2,8 @@ package io.imast.work4j.worker.controller;
 
 import java.util.List;
 import java.util.Properties;
-import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
+import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.model.worker.Worker;
@@ -19,7 +19,6 @@ import io.imast.work4j.worker.instance.QuartzInstance;
 import io.vavr.control.Try;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.UUID;
 import org.quartz.JobListener;
 import org.quartz.SchedulerListener;
 import org.quartz.TriggerListener;
@@ -67,9 +66,9 @@ public class WorkerControllerBuilder {
     private final List<TriggerListener> triggerListeners;
     
     /**
-     * The set of worker supervisors
+     * The set of worker listeners
      */
-    private final List<WorkerSupervior> supervisors;
+    private final List<WorkerListener> listeners;
     
     /**
      * The worker instance
@@ -91,7 +90,7 @@ public class WorkerControllerBuilder {
         this.schedulerListeners = new ArrayList<>();
         this.jobListeners = new ArrayList<>();
         this.triggerListeners = new ArrayList<>();
-        this.supervisors = new ArrayList<>();
+        this.listeners = new ArrayList<>();
         this.factory = new WorkerFactory();
         this.jobModules = new HashMap<>();
     }
@@ -154,13 +153,13 @@ public class WorkerControllerBuilder {
     }
     
     /**
-     * Use the given supervisor
+     * Use the given listener
      * 
-     * @param supervisor The supervisor to add
+     * @param listener The listener to add
      * @return Returns builder for chaining
      */
-    public WorkerControllerBuilder withSupervisor(WorkerSupervior supervisor){
-        this.supervisors.add(supervisor);
+    public WorkerControllerBuilder withListener(WorkerListener listener){
+        this.listeners.add(listener);
         return this;
     }
     
@@ -311,20 +310,25 @@ public class WorkerControllerBuilder {
         // create a scheduler instance
         var scheduler = this.initScheduler();
      
-        // list of supervisors
-        var allSupervisors = new ArrayList<WorkerSupervior>();
+        // list of all listeners
+        var allListeners = new ArrayList<WorkerListener>();
         
         // create a quartz instance
         var instance = new QuartzInstance(scheduler);
         
         // if polling rate is specified create a supervisor
         if(this.config.getPollingRate() != null && this.config.getPollingRate() > 0){
-            allSupervisors.add(new PollingWorkerListener(instance, this.schedulerChannel, this.config));
+            allListeners.add(new PollingWorkerListener(this.worker, instance, this.schedulerChannel, this.config));
         }
         
         // add rest of supervisors
-        allSupervisors.addAll(this.supervisors);
+        allListeners.addAll(this.listeners);
         
-        return new WorkerController(instance, this.schedulerChannel, allSupervisors, this.config);
+        // in case of standalone scheduler at least one listener should be there
+        if(this.config.getClusteringType() == ClusteringType.STANDALONE){
+            throw new WorkerException("Standalone scheduling needs at least one listener or a positive polling rate");
+        }
+        
+        return new WorkerController(this.worker, instance, this.schedulerChannel, allListeners, this.config);
     }
 }
