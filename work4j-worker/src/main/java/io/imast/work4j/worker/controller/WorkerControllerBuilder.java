@@ -6,6 +6,7 @@ import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
+import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.worker.ClusteringType;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.WorkerConfiguration;
@@ -71,15 +72,10 @@ public class WorkerControllerBuilder {
     private final List<WorkerSupervior> supervisors;
     
     /**
-     * The cluster name
+     * The worker instance
      */
-    private final String cluster;
+    private Worker worker;
     
-    /**
-     * The worker name
-     */
-    private final String worker;
-
     /**
      * The scheduler channel
      */
@@ -96,8 +92,6 @@ public class WorkerControllerBuilder {
         this.jobListeners = new ArrayList<>();
         this.triggerListeners = new ArrayList<>();
         this.supervisors = new ArrayList<>();
-        this.cluster = Str.blank(this.config.getCluster()) ? JobConstants.DEFAULT_CLUSTER : this.config.getCluster();
-        this.worker = Str.blank(this.config.getWorker()) ? UUID.randomUUID().toString() : this.config.getWorker();
         this.factory = new WorkerFactory();
         this.jobModules = new HashMap<>();
     }
@@ -120,6 +114,17 @@ public class WorkerControllerBuilder {
      */
     public WorkerControllerBuilder withChannel(SchedulerChannel channel){
         this.schedulerChannel = channel;
+        return this;
+    }
+    
+    /**
+     * Sets a worker instance for the controller
+     * 
+     * @param worker The worker instance
+     * @return Returns builder for chaining
+     */
+    public WorkerControllerBuilder withWorker(Worker worker){
+        this.worker = worker;
         return this;
     }
     
@@ -170,8 +175,8 @@ public class WorkerControllerBuilder {
         var props = new Properties();
         
         // set instance name for quartz scheduler
-        props.setProperty("org.quartz.scheduler.instanceName", "WORK4J_" + this.cluster);
-        props.setProperty("org.quartz.scheduler.instanceId", "WORK4J_" + this.worker);
+        props.setProperty("org.quartz.scheduler.instanceName", "WORK4J_" + this.worker.getCluster());
+        props.setProperty("org.quartz.scheduler.instanceId", "WORK4J_" + this.worker.getName());
         props.setProperty("org.quartz.threadPool.threadCount", this.config.getParallelism().toString());
         
         // other props
@@ -298,6 +303,11 @@ public class WorkerControllerBuilder {
             throw new WorkerException("Worker Factory is required");
         }
         
+        // validate worker
+        if(this.worker == null){
+            throw new WorkerException("Worker Instance is required");
+        }
+        
         // create a scheduler instance
         var scheduler = this.initScheduler();
      
@@ -305,11 +315,11 @@ public class WorkerControllerBuilder {
         var allSupervisors = new ArrayList<WorkerSupervior>();
         
         // create a quartz instance
-        var instance = new QuartzInstance(this.worker, this.cluster, scheduler, this.factory);
+        var instance = new QuartzInstance(scheduler);
         
         // if polling rate is specified create a supervisor
         if(this.config.getPollingRate() != null && this.config.getPollingRate() > 0){
-            allSupervisors.add(new PollingSupervisor(instance, this.schedulerChannel, this.config));
+            allSupervisors.add(new PollingWorkerListener(instance, this.schedulerChannel, this.config));
         }
         
         // add rest of supervisors

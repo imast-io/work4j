@@ -20,7 +20,7 @@ public class WorkerInput {
     /**
      * The worker name
      */
-    private String worker;
+    private String name;
     
     /**
      * The tenant identifier

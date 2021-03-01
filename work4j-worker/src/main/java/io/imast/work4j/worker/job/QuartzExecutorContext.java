@@ -33,7 +33,7 @@ public class QuartzExecutorContext implements JobExecutorContext {
      */
     @Override
     public String getExecutionId(){
-        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXEC_ID);
+        return JobOps.getValue(this.context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXECUTION_ID);
     }
     
     /**

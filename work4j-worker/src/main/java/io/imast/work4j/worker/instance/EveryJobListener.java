@@ -73,7 +73,7 @@ public class EveryJobListener implements JobListener {
     public void jobWasExecuted(JobExecutionContext context, JobExecutionException jobException) {
 
         // the job execution id
-        var executionId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXEC_ID);
+        var executionId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_EXECUTION_ID);
         
         // the job definition id
         var jobId = JobOps.<String>getValue(context.getJobDetail().getJobDataMap(), JobConstants.PAYLOAD_JOB_DEFINITION_ID);

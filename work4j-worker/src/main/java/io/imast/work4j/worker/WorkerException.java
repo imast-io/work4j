@@ -5,7 +5,7 @@ package io.imast.work4j.worker;
  * 
  * @author davitp
  */
-public class WorkerException extends Exception {
+public class WorkerException extends RuntimeException {
     
     /**
      * Creates new instance of exception

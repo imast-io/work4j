@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * The job manager configuration
+ * The Worker Configuration
  * 
  * @author davitp
  */
@@ -17,14 +17,19 @@ import lombok.NoArgsConstructor;
 public class WorkerConfiguration {
     
     /**
-     * The agent name job manager runs on
+     * The worker name to use
      */
-    private String worker;
+    private String name;
     
     /**
-     * The manager cluster name
+     * The cluster of worker 
      */
     private String cluster;
+    
+    /**
+     * The tenant value for multi-tenant environment
+     */
+    private String tenant;
     
     /**
      * The level of parallelism
