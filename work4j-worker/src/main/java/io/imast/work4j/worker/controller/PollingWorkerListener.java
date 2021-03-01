@@ -4,19 +4,26 @@ import io.imast.core.Coll;
 import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
-import io.imast.work4j.model.exchange.JobMetadataRequest;
+import io.imast.work4j.channel.worker.WorkerListener;
+import io.imast.work4j.channel.worker.WorkerMessage;
+import io.imast.work4j.model.execution.ExecutionIndexEntry;
+import io.imast.work4j.model.execution.ExecutionIndexRequest;
+import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
 import io.vavr.control.Try;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import reactor.core.Disposable;
 
 /**
  * The polling based worker listener
@@ -24,7 +31,12 @@ import lombok.extern.slf4j.Slf4j;
  * @author davitp
  */
 @Slf4j
-public class PollingSupervisor implements WorkerSupervior {
+public class PollingWorkerListener implements WorkerListener {
+    
+    /**
+     * The worker instance
+     */
+    protected final Worker worker;
 
     /**
      * The quartz instance
@@ -49,16 +61,18 @@ public class PollingSupervisor implements WorkerSupervior {
     /**
      * The set of consumers
      */
-    protected final LinkedList<Consumer<WorkerUpdateMessage>> consumers;
+    protected final LinkedList<Consumer<WorkerMessage>> consumers;
     
     /**
      * The scheduler channel
      * 
+     * @param worker The worker instance
      * @param instance The quartz instance
      * @param channel The polling channel
      * @param config The worker configuration
      */
-    public PollingSupervisor(QuartzInstance instance, SchedulerChannel channel, WorkerConfiguration config){
+    public PollingWorkerListener(Worker worker, QuartzInstance instance, SchedulerChannel channel, WorkerConfiguration config){
+        this.worker = worker;
         this.instance = instance;
         this.channel = channel;
         this.config = config;
@@ -86,7 +100,7 @@ public class PollingSupervisor implements WorkerSupervior {
      * @param consumer The consumer to add
      */
     @Override
-    public void add(Consumer<WorkerUpdateMessage> consumer) {
+    public void add(Consumer<WorkerMessage> consumer) {
         this.consumers.add(consumer);
     }
 
@@ -96,7 +110,7 @@ public class PollingSupervisor implements WorkerSupervior {
      * @param consumer The consumer to remove
      */
     @Override
-    public void remove(Consumer<WorkerUpdateMessage> consumer) {
+    public void remove(Consumer<WorkerMessage> consumer) {
         this.consumers.removeLastOccurrence(consumer);
     }
 
@@ -118,7 +132,7 @@ public class PollingSupervisor implements WorkerSupervior {
             this.syncImpl();
         }
         catch(WorkerException error){
-            log.error(String.format("PollingSupervisor: Could not sync jobs, Error: %s", error.getLocalizedMessage()), error);
+            log.error(String.format("PollingListener: Could not sync executions, Error: %s", error.getLocalizedMessage()), error);
         }
     }
     
@@ -129,46 +143,17 @@ public class PollingSupervisor implements WorkerSupervior {
      */
     protected void syncImpl() throws WorkerException{
         
+        // the index request 
+        var indexRequest = ExecutionIndexRequest.builder()
+                .cluster(this.worker.getCluster())
+                .tenant(this.worker.getTenant())
+                .build();
+        
         // get metadata for cluster
-        var metadata = this.channel.metadata(new JobMetadataRequest(this.instance.getCluster())).orElse(null);
-        
-        // check if no groups
-        if(metadata == null){
-            throw new WorkerException("PollingSupervisor: Could not pull metadata from controller.");
-        }
-
-        // get groups
-        var groups = new HashSet<>(Lang.or(metadata.getGroups(), Str.EMPTY_LIST));
-        
-        // get running groups
-        var runningGroups = Try.of(() -> this.instance.getGroups()).getOrElse(Str.EMPTY_LIST);
-        
-        // unschedule all jobs in groups if the groups is not in controller
-        runningGroups.forEach(running -> {
-            
-            // leave group as it is running both in controller and in worker
-            if(groups.contains(running)){
-                return;
-            }
-            
-            // for each job in group raise unschedule uperation
-            Try.of(() -> this.instance.getJobs(running))
-                    .getOrElse(Set.of())
-                    .forEach(code -> this.raise(new WorkerUpdateMessage(UpdateOperation.REMOVE, code, running, null)));
-        });
-        
-        // types of jobs
-        var types = this.instance.getTypes();
-        
-        // for every (group, type) pair do sync process
-        Coll.doubleForeach(groups, types, (group, type) -> {
-            try{
-                this.syncGroupImpl(group, type);
-            }
-            catch(WorkerException ex){
-                log.warn("PollingSupervisor: Something went wrong while syncing jobs. " + ex.getMessage());
-            }
-        });
+        this.channel.executionIndex(indexRequest).subscribe(response -> {
+            this.syncIndex(response.getEntries()); 
+        }, 
+        err -> log.error("PollingListener: Could not pull execution index.", err));
     }
     
     /**
@@ -213,5 +198,31 @@ public class PollingSupervisor implements WorkerSupervior {
      */
     protected void raise(WorkerUpdateMessage message){
         this.consumers.forEach(consumer -> consumer.accept(message));
+    }
+
+    /**
+     * Do sync operation based on received entries
+     * 
+     * @param entries The received index entries
+     * @throws WorkerException 
+     */
+    protected void syncIndex(List<ExecutionIndexEntry> entries) throws WorkerException {
+
+        // check if no groups
+        if(entries == null || entries.isEmpty()){
+            return;
+        }
+
+        // build map out of index entries
+        var index = entries.stream().collect(Collectors.toMap(e -> e.getId(), e -> e));
+        
+        // the set of paused jobs
+        var paused = this.instance.getPausedExecutions();
+        
+        // the set of executions
+        var all = this.instance.getExecutions();
+        
+        
+        
     }
 }

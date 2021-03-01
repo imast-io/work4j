@@ -1,14 +1,9 @@
 package io.imast.work4j.worker.controller;
 
-import io.imast.work4j.channel.UpdateOperation;
-import io.imast.work4j.channel.WorkerUpdateMessage;
-import io.imast.work4j.channel.WorkerSupervior;
-import io.imast.core.Lang;
-import io.imast.core.Zdt;
 import io.imast.work4j.channel.SchedulerChannel;
-import io.imast.work4j.model.agent.AgentActivityType;
-import io.imast.work4j.model.agent.AgentDefinition;
-import io.imast.work4j.model.agent.AgentHealth;
+import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.worker.WorkerActivity;
+import io.imast.work4j.model.worker.WorkerHeartbeat;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
@@ -50,50 +45,28 @@ public class WorkerController {
     protected final ScheduledExecutorService asyncExecutor;
     
     /**
-     * The agent instance to register
+     * The registered worker instance 
      */
-    protected AgentDefinition agent;
+    protected final Worker worker;
     
     /**
      * Creates new controller based on quartz instance and communication channel
      * 
+     * @param worker The worker instance
      * @param instance The quartz instance
      * @param channel The channel
      * @param supervisors The worker supervisors
      * @param config The worker configuration
      */
-    public WorkerController(QuartzInstance instance, SchedulerChannel channel, List<WorkerSupervior> supervisors, WorkerConfiguration config){
+    public WorkerController(Worker worker, QuartzInstance instance, SchedulerChannel channel, List<WorkerSupervior> supervisors, WorkerConfiguration config){
+        this.worker = worker;
         this.instance = instance;
         this.channel = channel;
         this.supervisors = supervisors;
         this.config = config;
         this.asyncExecutor = Executors.newScheduledThreadPool(1);
     }
-    
-    /**
-     * Initialize worker controller instance
-     * 
-     * @throws WorkerException 
-     */
-    public void initialize() throws WorkerException {
         
-        // number of tries
-        var agentTries = this.config.getWorkerRegistrationTries();
-        
-        // by default try N times
-        if(agentTries == null || agentTries <= 0){
-            agentTries = 10;
-        }
-        
-        // try to register agent
-        this.agent = this.ensureRegister(agentTries);
-        
-        // make sure registered
-        if(this.agent == null){
-            throw new WorkerException("Unable to register agent definition");
-        }
-    }
-    
     /**
      * Start worker
      * @throws io.imast.work4j.worker.WorkerException
@@ -163,66 +136,13 @@ public class WorkerController {
             this.instance.unschedule(message.getCode(), message.getGroup());
         }
     }
-    
-    /**
-     * Ensures that agent client has been registered
-     * 
-     * @param tryCount Number of tries
-     * @return Returns true if successful
-     */
-    protected AgentDefinition ensureRegister(int tryCount){
-        
-        // try several times
-        for(int i = 0; i < tryCount; ++i){
-            
-            // register
-            var agentResult = this.register();
-            
-            // if successfuly registered
-            if(agentResult != null){
-                return agentResult;
-            }
-            
-            // delay for the next try
-            Lang.wait(5000);
-        }
-        
-        return null;
-    }
-    
-    /**
-     * Register itself to the scheduler
-     * 
-     * @return Returns created agent definition or null
-     */
-    protected AgentDefinition register(){
-
-        // now time
-        var now = Zdt.utc();
-        
-        // worker at cluster identity
-        var identity = String.format("%s@%s", this.instance.getWorker(), this.instance.getCluster());
-        
-        // the agent definition
-        var entity = AgentDefinition.builder()
-                .id(identity)
-                .worker(this.instance.getWorker())
-                .cluster(this.instance.getCluster())
-                .name(identity)
-                .health(new AgentHealth(now, AgentActivityType.REGISTER))
-                .heartbeatFreq(this.config.getHeartbeatRate())
-                .registered(now)
-                .build();
-        
-        return this.channel.registration(entity).orElse(null);
-    }
-    
+   
     /**
      * Report the health to scheduler
      */
-    private void heartbeat() {
+    protected void heartbeat() {
                 
         // report new health info
-        this.channel.heartbeat(this.agent.getId(), new AgentHealth(Zdt.utc(), AgentActivityType.HEARTBEAT));
+        this.channel.heartbeat(this.worker.getId(), WorkerHeartbeat.builder().activity(WorkerActivity.HEARTBEAT).build());
     }
 }

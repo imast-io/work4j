@@ -1314,7 +1314,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // make sure worker value is fine
-        if(Str.blank(input.getWorker()) || !NAME_REGEX.asMatchPredicate().test(input.getWorker())){
+        if(Str.blank(input.getName()) || !NAME_REGEX.asMatchPredicate().test(input.getName())){
             validation.add("The worker value is missing or invalid");
         }
         
@@ -1341,7 +1341,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             var worker = Worker.builder()
                     .id(newId)
                     .cluster(input.getCluster())
-                    .worker(input.getWorker())
+                    .name(input.getName())
                     .tenant(input.getTenant())
                     .maxIdle(input.getMaxIdle())
                     .created(now)

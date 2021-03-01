@@ -10,7 +10,7 @@ public class JobConstants {
     /**
      * The default cluster name
      */
-    public static final String DEFAULT_CLUSTER = "DEFAULT_CLUSTER";
+    public static final String DEFAULT_CLUSTER = "/";
     
     /**
      * The job session context
@@ -25,7 +25,7 @@ public class JobConstants {
     /**
      * The job execution id key
      */
-    public static final String PAYLOAD_JOB_EXEC_ID = "_PLD_JOB_EXEC_ID";
+    public static final String PAYLOAD_JOB_EXECUTION_ID = "_PLD_JOB_EXECUTION_ID";
     
     /**
      * The job id key
