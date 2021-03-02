@@ -1,8 +1,10 @@
 package io.imast.work4j.model.worker;
 
 import java.util.Date;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * The worker information
@@ -10,6 +12,8 @@ import lombok.Data;
  * @author davitp
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder(toBuilder = true)
 public class Worker {
     

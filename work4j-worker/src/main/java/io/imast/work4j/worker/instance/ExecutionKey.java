@@ -101,7 +101,7 @@ public class ExecutionKey {
     public static ExecutionKey from(String executionKey){
         
         // split into two parts if possible 
-        var split = executionKey.split(executionKey, 2);
+        var split = executionKey.split(":", 2);
         
         // get the execution id
         var executionId = split.length > 0 ? split[0] : null;

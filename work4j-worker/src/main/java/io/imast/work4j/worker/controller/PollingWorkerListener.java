@@ -279,6 +279,11 @@ public class PollingWorkerListener implements WorkerListener {
         // load missing elements for each portion
         portions.forEach(portion -> {
             
+            // nothing to do with empty portions
+            if(portion == null || portion.isEmpty()){
+                return;
+            }
+            
             // load portion
             var load = this.channel.executions(portion);
             
@@ -287,11 +292,11 @@ public class PollingWorkerListener implements WorkerListener {
                 response -> {
                     
                     // nothing to do, no result
-                    if(response == null || response.getExecutions() == null){
+                    if(response == null || response.isEmpty()){
                         return;
                     }
                     
-                    response.getExecutions().forEach(exec -> this.raise(new WorkerExecutionCreated(exec)));
+                    response.forEach(exec -> this.raise(new WorkerExecutionCreated(exec)));
                     
                 }, 
                 error ->  log.error("PollingListener: Could not load portion of executions", error)

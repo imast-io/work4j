@@ -3,6 +3,7 @@ package io.imast.work4j.model.issue;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * The data issue entity
@@ -11,6 +12,7 @@ import lombok.Data;
  */
 @Data
 @Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class DataIssue {
     

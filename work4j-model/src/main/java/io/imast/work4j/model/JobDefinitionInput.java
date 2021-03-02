@@ -3,8 +3,10 @@ package io.imast.work4j.model;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * The Job Definition Input Model
@@ -12,6 +14,8 @@ import lombok.Data;
  * @author davitp
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder(toBuilder = true)
 public class JobDefinitionInput implements Serializable {
 

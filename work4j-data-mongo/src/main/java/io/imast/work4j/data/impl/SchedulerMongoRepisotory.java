@@ -150,9 +150,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             // index executions by update time
             this.executions.createIndex(Indexes.descending("modified"), new IndexOptions().name("executions_by_modified"));
             
-            // create unique index for (name, folder) pair
-            this.executions.createIndex(Indexes.ascending("name", "folder"), new IndexOptions().name("execution_unique_name_folder").unique(true));
-
             // index iterations by timestamp for easy paging
             this.iterations.createIndex(Indexes.descending("timestamp"), new IndexOptions().name("iteration_by_timestamp_desc"));
 
@@ -815,7 +812,10 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             }
                         
             // the update fields
-            Map updateFields = Map.of("modified", new Date(), "status", validInput.getStatus(), "completionSeverity", validInput.getSeverity());
+            Map updateFields = Map.of(
+                    "modified", new Date(), 
+                    "status", validInput.getStatus() == null ? null : validInput.getStatus().name(), 
+                    "completionSeverity", validInput.getSeverity() == null ? null : validInput.getSeverity().name());
             
             // the update entity
             var updateEntity = new Document("$set", new Document(updateFields));
@@ -1633,7 +1633,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // if cluster override value is given but is malformed report issue
-        if(Str.blank(input.getCluster()) && !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
+        if(!Str.blank(input.getCluster()) && !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
             issues.add("The job cluster override value is given but contains invalid characters");
         }
         

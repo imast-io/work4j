@@ -2,8 +2,10 @@ package io.imast.work4j.model.iterate;
 
 import java.util.Date;
 import java.util.Map;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * The job iteration data structure
@@ -11,6 +13,8 @@ import lombok.Data;
  * @author davitp
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder(toBuilder = true)
 public class IterationInput {
     
