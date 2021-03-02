@@ -33,7 +33,7 @@ public interface SchedulerChannel {
      * @param ids The executions request ids
      * @return Returns executions response
      */
-    public Mono<ExecutionsResponse> executions(List<String> ids);
+    public Mono<List<JobExecution>> executions(List<String> ids);
     
     /**
      * Completes the job execution in scheduler

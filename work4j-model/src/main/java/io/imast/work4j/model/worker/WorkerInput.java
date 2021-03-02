@@ -1,7 +1,9 @@
 package io.imast.work4j.model.worker;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * The worker input
@@ -9,6 +11,8 @@ import lombok.Data;
  * @author davitp
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder(toBuilder = true)
 public class WorkerInput {
     

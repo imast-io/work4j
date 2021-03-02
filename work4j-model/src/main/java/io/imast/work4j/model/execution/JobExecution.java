@@ -5,8 +5,10 @@ import io.imast.work4j.model.TriggerDefinition;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * The job execution instance to run
@@ -14,6 +16,8 @@ import lombok.Data;
  * @author davitp
  */
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder(toBuilder = true)
 public class JobExecution {
     

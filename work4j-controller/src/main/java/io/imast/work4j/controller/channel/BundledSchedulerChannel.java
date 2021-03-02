@@ -65,14 +65,14 @@ public class BundledSchedulerChannel implements SchedulerChannel {
      * @return Returns executions response
      */
     @Override
-    public Mono<ExecutionsResponse> executions(List<String> ids){
+    public Mono<List<JobExecution>> executions(List<String> ids){
         
         // try get executions
         var executions = Try.of(() -> this.controller.getExecutionsByIds(ids));
         
         // in case of success build and return response
         if(executions.isSuccess()){
-            return Mono.just(new ExecutionsResponse(executions.get(), executions.get().size()));
+            return Mono.just(executions.get());
         }
         
         return Mono.empty();
