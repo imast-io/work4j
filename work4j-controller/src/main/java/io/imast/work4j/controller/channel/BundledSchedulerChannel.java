@@ -3,11 +3,9 @@ package io.imast.work4j.controller.channel;
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.controller.SchedulerController;
 import io.imast.work4j.model.execution.CompletionSeverity;
-import io.imast.work4j.model.execution.ExecutionIndexRequest;
-import io.imast.work4j.model.execution.ExecutionIndexResponse;
+import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionUpdateInput;
 import io.imast.work4j.model.execution.ExecutionStatus;
-import io.imast.work4j.model.execution.ExecutionsRequest;
 import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
 import io.imast.work4j.model.iterate.Iteration;
@@ -16,6 +14,7 @@ import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.model.worker.WorkerHeartbeat;
 import io.imast.work4j.model.worker.WorkerInput;
 import io.vavr.control.Try;
+import java.util.List;
 import reactor.core.publisher.Mono;
 
 /**
@@ -42,17 +41,18 @@ public class BundledSchedulerChannel implements SchedulerChannel {
     /**
      * Pull job groups for the given cluster
      * 
-     * @param request The request structure of executions
+     * @param tenant The target tenant
+     * @param cluster The target cluster
      * @return Returns execution index entries
      */
     @Override
-    public Mono<ExecutionIndexResponse> executionIndex(ExecutionIndexRequest request) {
+    public Mono<List<ExecutionIndexEntry>> executionIndex(String tenant, String cluster) {
         // try get executions
-        var executions = Try.of(() -> this.controller.getExecutionIndex(request.getTenant(), request.getCluster()));
+        var executions = Try.of(() -> this.controller.getExecutionIndex(tenant, cluster));
         
         // in case of success build and return response
         if(executions.isSuccess()){
-            return Mono.just(new ExecutionIndexResponse(executions.get()));
+            return Mono.just(executions.get());
         }
         
         return Mono.empty();
@@ -61,14 +61,14 @@ public class BundledSchedulerChannel implements SchedulerChannel {
     /**
      * Exchange current status with modified entries
      * 
-     * @param request The executions request 
+     * @param ids The executions request ids
      * @return Returns executions response
      */
     @Override
-    public Mono<ExecutionsResponse> executions(ExecutionsRequest request){
+    public Mono<ExecutionsResponse> executions(List<String> ids){
         
         // try get executions
-        var executions = Try.of(() -> this.controller.getExecutionsByIds(request.getExecutions()));
+        var executions = Try.of(() -> this.controller.getExecutionsByIds(ids));
         
         // in case of success build and return response
         if(executions.isSuccess()){
