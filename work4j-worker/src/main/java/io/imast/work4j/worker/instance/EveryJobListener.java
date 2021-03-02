@@ -5,6 +5,7 @@ import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.JobOptions;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
+import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.job.JobOps;
 import java.util.Date;
@@ -22,6 +23,11 @@ import org.quartz.JobListener;
 public class EveryJobListener implements JobListener {
 
     /**
+     * The worker instance
+     */
+    protected final Worker worker;
+    
+    /**
      * The scheduler channel
      */
     protected final SchedulerChannel schedulerChannel;
@@ -29,9 +35,11 @@ public class EveryJobListener implements JobListener {
     /**
      * Creates new instance of Every Job Listener
      * 
+     * @param worker The worker instance
      * @param schedulerChannel The worker channel
      */
-    public EveryJobListener(SchedulerChannel schedulerChannel) {
+    public EveryJobListener(Worker worker, SchedulerChannel schedulerChannel) {
+        this.worker = worker;
         this.schedulerChannel = schedulerChannel;   
     }
     

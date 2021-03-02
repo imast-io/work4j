@@ -2,14 +2,13 @@ package io.imast.work4j.channel;
 
 import io.imast.work4j.model.iterate.*;
 import io.imast.work4j.model.execution.CompletionSeverity;
-import io.imast.work4j.model.execution.ExecutionIndexRequest;
-import io.imast.work4j.model.execution.ExecutionIndexResponse;
-import io.imast.work4j.model.execution.ExecutionsRequest;
+import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
 import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.model.worker.WorkerHeartbeat;
 import io.imast.work4j.model.worker.WorkerInput;
+import java.util.List;
 import reactor.core.publisher.Mono;
 
 /**
@@ -22,18 +21,19 @@ public interface SchedulerChannel {
     /**
      * Pull job groups for the given cluster
      * 
-     * @param request The request structure of executions
+     * @param tenant The target tenant
+     * @param cluster The target cluster
      * @return Returns execution index entries
      */
-    public Mono<ExecutionIndexResponse> executionIndex(ExecutionIndexRequest request);
+    public Mono<List<ExecutionIndexEntry>> executionIndex(String tenant, String cluster);
     
     /**
      * Exchange current status with modified entries
      * 
-     * @param request The executions request 
+     * @param ids The executions request ids
      * @return Returns executions response
      */
-    public Mono<ExecutionsResponse> executions(ExecutionsRequest request);
+    public Mono<ExecutionsResponse> executions(List<String> ids);
     
     /**
      * Completes the job execution in scheduler

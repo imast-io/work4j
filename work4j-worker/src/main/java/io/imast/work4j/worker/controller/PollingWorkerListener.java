@@ -8,9 +8,7 @@ import io.imast.work4j.channel.worker.WorkerExecutionResumed;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.channel.worker.WorkerMessage;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
-import io.imast.work4j.model.execution.ExecutionIndexRequest;
 import io.imast.work4j.model.execution.ExecutionStatus;
-import io.imast.work4j.model.execution.ExecutionsRequest;
 import io.imast.work4j.model.worker.Worker;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
@@ -151,17 +149,10 @@ public class PollingWorkerListener implements WorkerListener {
      */
     protected void syncImpl() throws WorkerException{
         
-        // the index request 
-        var indexRequest = ExecutionIndexRequest.builder()
-                .cluster(this.worker.getCluster())
-                .tenant(this.worker.getTenant())
-                .build();
-        
         // get metadata for cluster
-        this.channel.executionIndex(indexRequest).subscribe(response -> {
-            this.syncIndex(response.getEntries()); 
-        }, 
-        err -> log.error("PollingListener: Could not pull execution index.", err));
+        this.channel.executionIndex(this.worker.getTenant(), this.worker.getCluster()).subscribe(
+                this::syncIndex, 
+                err -> log.error("PollingListener: Could not pull execution index.", err));
     }
     
     /**
@@ -289,7 +280,7 @@ public class PollingWorkerListener implements WorkerListener {
         portions.forEach(portion -> {
             
             // load portion
-            var load = this.channel.executions(ExecutionsRequest.builder().executions(portion).build());
+            var load = this.channel.executions(portion);
             
             // on completion generate all required messages
             load.subscribe(

@@ -263,7 +263,7 @@ public class WorkerControllerBuilder {
         // add work4j listeners
         try{
             scheduler.getListenerManager().addSchedulerListener(new JobSchedulerListener(scheduler, this.schedulerChannel));
-            scheduler.getListenerManager().addJobListener(new EveryJobListener(this.schedulerChannel));
+            scheduler.getListenerManager().addJobListener(new EveryJobListener(this.worker, this.schedulerChannel));
             scheduler.getListenerManager().addTriggerListener(new EveryTriggerListener(this.schedulerChannel));
         }
         catch(SchedulerException ex){
