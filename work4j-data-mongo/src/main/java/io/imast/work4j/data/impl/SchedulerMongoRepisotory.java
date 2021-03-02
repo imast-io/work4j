@@ -48,12 +48,14 @@ import org.bson.types.ObjectId;
 import io.imast.work4j.data.SchedulerDataRepository;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.worker.WorkerHeartbeat;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * The mongo repository for the scheduler data
  * 
  * @author davitp
  */
+@Slf4j
 public class SchedulerMongoRepisotory implements SchedulerDataRepository {
 
     /**
@@ -102,18 +104,25 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     private final MongoCollection<JobExecution> executions;
     
     /**
+     * Indicates if operations should be transactional
+     */
+    private final boolean transactional;
+    
+    /**
      * Creates new instance of scheduler mongo repository
      * 
      * @param client The client to mongo
      * @param mongoDatabase The mongo database reference
+     * @param transactional Should operations be performed in transaction
      */
-    public SchedulerMongoRepisotory(MongoClient client, MongoDatabase mongoDatabase){
+    public SchedulerMongoRepisotory(MongoClient client, MongoDatabase mongoDatabase, boolean transactional){
         this.client = client;
         this.mongoDatabase = mongoDatabase;
-        this.definitions = this.mongoDatabase.getCollection(this.collection("definitions"), JobDefinition.class);
-        this.iterations = this.mongoDatabase.getCollection(this.collection("iterations"), Iteration.class);
-        this.workers = this.mongoDatabase.getCollection(this.collection("workers"), Worker.class);
-        this.executions = this.mongoDatabase.getCollection(this.collection("executions"), JobExecution.class);
+        this.definitions = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("definitions"), JobDefinition.class));
+        this.iterations = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("iterations"), Iteration.class));
+        this.workers = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("workers"), Worker.class));
+        this.executions = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("executions"), JobExecution.class));
+        this.transactional = transactional;
     }
     
     /**
@@ -187,7 +196,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
 
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.definitions.find(session, combined).into(new ArrayList<>());
         }));
     }
@@ -207,7 +216,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             throw new SchedulerDataException("Missing Id", Arrays.asList("Job ID is required"));
         }
         
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return Optional.ofNullable(this.definitions.find(session, this.hasId(id)).first());
         }));   
     }
@@ -248,7 +257,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get filtered page
             var filtered = this.definitions
@@ -291,7 +300,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         );
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // try get existing
             var existing = this.definitions.find(session, existingFilter).first();
@@ -377,7 +386,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing instance to update
             var existing = this.definitions.find(session, this.hasId(id)).first();
@@ -407,7 +416,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing item by id
             var existing = this.definitions.find(session, this.hasId(id)).first();
@@ -445,7 +454,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         );
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing item by name and folder
             var existing = this.definitions.find(session, existingFilter).first();
@@ -470,7 +479,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     public long deleteAllJobs() throws SchedulerDataException {
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.definitions.deleteMany(session, new BsonDocument()).getDeletedCount();
         }));
     }
@@ -509,7 +518,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.executions.find(session, combined).into(new ArrayList<>());
         }));
     }
@@ -530,7 +539,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.executions.find(session, eq("jobId", jobId)).into(new ArrayList<>());
         }));
     }
@@ -551,7 +560,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.executions.find(session, in("_id", ids)).into(new ArrayList<>());
         }));
     }
@@ -591,7 +600,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get filtered page
             var filtered = this.executions
@@ -635,7 +644,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
 
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get filtered page
             return this.executions
@@ -660,7 +669,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             throw new SchedulerDataException("Missing Id", Arrays.asList("Execution ID is required"));
         }
         
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return Optional.ofNullable(this.executions.find(session, this.hasId(id)).first());
         }));
     }
@@ -684,7 +693,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // try get job definition
             var jobDefinition = this.definitions.find(session, this.hasId(input.getJobId())).first();
@@ -790,7 +799,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // try get execution to update
             var execution = this.executions.find(session, this.hasId(id)).first();
@@ -847,7 +856,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing item by id
             var existing = this.executions.find(session, this.hasId(id)).first();
@@ -878,7 +887,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.executions.deleteMany(session, eq("jobId", jobId)).getDeletedCount();
         }));
     }
@@ -905,7 +914,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.executions.deleteMany(session, filter).getDeletedCount();
         }));
     }
@@ -919,7 +928,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     @Override
     public long deleteAllExecutions() throws SchedulerDataException {
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.executions.deleteMany(session, new BsonDocument()).getDeletedCount();
         }));
     }
@@ -933,7 +942,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     @Override
     public List<Iteration> getAllIterations() throws SchedulerDataException {
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.find(session, new BsonDocument()).into(new ArrayList<>());
         }));
     }
@@ -954,7 +963,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.find(session, eq("jobId", jobId)).into(new ArrayList<>());
         }));
     }
@@ -975,7 +984,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.find(session, eq("executionId", executionId)).into(new ArrayList<>());
         }));
     }
@@ -995,7 +1004,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             throw new SchedulerDataException("Missing Id", Arrays.asList("Iteration ID is required"));
         }
         
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return Optional.ofNullable(this.iterations.find(session, this.hasId(id)).first());
         }));
     }
@@ -1036,7 +1045,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get filtered page
             var filtered = this.iterations
@@ -1095,7 +1104,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var newId = ObjectId.get().toHexString();
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // build new iteration to save
             var iteration = Iteration.builder()
@@ -1147,7 +1156,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
 
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing item by id
             var existing = this.iterations.find(session, this.hasId(id)).first();
@@ -1178,7 +1187,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.deleteMany(session, eq("jobId", jobId)).getDeletedCount();
         }));
     }
@@ -1199,7 +1208,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.deleteMany(session, eq("executionId", executionId)).getDeletedCount();
         }));
     }
@@ -1213,7 +1222,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     @Override
     public long deleteAllIterations() throws SchedulerDataException {
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.deleteMany(session, new BsonDocument()).getDeletedCount();
         }));
     }
@@ -1234,7 +1243,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.iterations.deleteMany(session, lt("timestamp", timestamp)).getDeletedCount();
         }));
     }
@@ -1248,7 +1257,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     @Override
     public List<Worker> getAllWorkers() throws SchedulerDataException {
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.workers.find(session, new BsonDocument()).into(new ArrayList<>());
         }));
     }
@@ -1269,7 +1278,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.workers.find(session, eq("cluster", cluster)).into(new ArrayList<>());
         }));
     }
@@ -1290,7 +1299,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // find all elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return Optional.ofNullable(this.workers.find(session, this.hasId(id)).first());
         }));
     }
@@ -1335,7 +1344,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var now = new Date();
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // build new worker to save
             var worker = Worker.builder()
@@ -1390,7 +1399,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var activity = heartbeat.getActivity() == null ? WorkerActivity.HEARTBEAT : heartbeat.getActivity();
         
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // try get worker to update
             var worker = this.workers.find(session, this.hasId(id)).first();
@@ -1465,7 +1474,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // delete elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.workers.deleteMany(session, and(filters)).getDeletedCount();
         }));
     }
@@ -1497,7 +1506,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
         
          // delete elements with filter
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             return this.workers.deleteMany(session, combined).getDeletedCount();
         }));
     }
@@ -1518,7 +1527,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
 
         // do within transaction 
-        return this.handle(() -> MongoOps.withTransaction(this.client, session -> {
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing item by id
             var existing = this.workers.find(session, this.hasId(id)).first();
@@ -1687,6 +1696,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             throw e;
         }
         catch(Throwable e){
+            log.error("Mongo Error", e);
             throw new SchedulerDataException(e);
         }
     }
