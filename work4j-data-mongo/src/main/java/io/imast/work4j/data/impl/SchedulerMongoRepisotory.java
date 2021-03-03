@@ -46,6 +46,12 @@ import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import io.imast.work4j.data.SchedulerDataRepository;
+import io.imast.work4j.model.Jobs;
+import io.imast.work4j.model.Tenants;
+import io.imast.work4j.model.cluster.ClusterDefinition;
+import io.imast.work4j.model.cluster.ClusterJoinInput;
+import io.imast.work4j.model.cluster.ClusterJoinResult;
+import io.imast.work4j.model.cluster.Clusters;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.cluster.WorkerHeartbeat;
 import java.util.HashMap;
@@ -65,14 +71,9 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     protected static final String COLLECTION_PREFIX = "work4j";
     
     /**
-     * The name regex pattern
+     * The worker regex pattern
      */
-    protected static Pattern NAME_REGEX = Pattern.compile("^[a-zA-Z0-9_]+$");
-    
-    /**
-     * The folder regex pattern
-     */
-    protected static Pattern FOLDER_REGEX = Pattern.compile("^(\\/[A-Za-z0-9_]+)*\\/$");
+    protected static Pattern WORKER_NAME_REGEX = Pattern.compile("^[a-zA-Z0-9_-]+$");
     
     /**
      * The mongo database client
@@ -95,9 +96,9 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     private final MongoCollection<Iteration> iterations;
     
     /**
-     * The workers collection
+     * The clusters collection
      */
-    private final MongoCollection<Worker> workers;
+    private final MongoCollection<ClusterDefinition> clusters;
     
     /**
      * The executions collection
@@ -121,7 +122,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         this.mongoDatabase = mongoDatabase;
         this.definitions = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("definitions"), JobDefinition.class));
         this.iterations = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("iterations"), Iteration.class));
-        this.workers = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("workers"), Worker.class));
+        this.clusters = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("clusters"), ClusterDefinition.class));
         this.executions = MongoOps.withPojo(this.mongoDatabase.getCollection(this.collection("executions"), JobExecution.class));
         this.transactional = transactional;
     }
@@ -1384,6 +1385,108 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     }
     
     /**
+     * Join the worker to the cluster
+     * 
+     * @param tenant The target tenant
+     * @param input The worker joining input
+     * @return Returns result of operation
+     * @throws SchedulerDataException
+     */
+    public ClusterJoinResult joinCluster(String tenant, ClusterJoinInput input) throws SchedulerDataException {
+        
+        // validation log
+        var validation = new ArrayList<String>();
+      
+        // make sure cluster value is fine
+        if(Str.blank(input.getCluster()) || !Clusters.CLUSTER_REGEX.asMatchPredicate().test(input.getCluster())){
+            validation.add("The cluster value is missing or invalid");
+        }
+        
+        // make sure worker value is fine
+        if(Str.blank(input.getWorker()) || !Clusters.WORKER_REGEX.asMatchPredicate().test(input.getWorker())){
+            validation.add("The worker name value is missing or invalid");
+        }
+        
+        // make sure max idle time is a positive value
+        if(input.getMaxIdle() <= 0){
+            validation.add("The maximum idle time should be a positive value");
+        }
+        
+        // kind must be provided
+        if(input.getKind() == null){
+            validation.add("The worker kind should be provided");
+        }
+        
+        // in case of any issue raise an exception
+        if(!validation.isEmpty()){
+            throw new SchedulerDataException("Invalid Worker", validation);
+        }
+        
+        // the cluster filter
+        var clusterFilter = and(eq("tenant", Tenants.maybe(tenant)), eq("cluster", input.getCluster()));
+        
+        // new entity id
+        var newId = ObjectId.get().toHexString();
+        
+        // the current time
+        var now = new Date();
+        
+        // do within transaction 
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
+            
+            // try get existing cluster
+            var existingCluster = this.clusters.find(session, clusterFilter).first();
+            
+            // check if no cluster with mentioned name
+            if(existingCluster == null){
+                
+                // create new cluster to save
+                var newCluster = ClusterDefinition.builder()
+                        .id(newId)
+                        .cluster(input.getCluster())
+                        .tenant(Tenants.maybe(tenant))
+                        .maxIdle(input.getMaxIdle())
+                        .workers(new ArrayList<>())
+                        .created(now)
+                        .updated(now)
+                        .build();
+                
+                // try insert
+                this.clusters.insertOne(session, newCluster);
+                
+                // get inserted object back
+                existingCluster = this.clusters.find(session, this.hasId(newId)).first();
+                
+                // could not save cluster, something went wrong
+                if(existingCluster == null){
+                    throw new SchedulerDataException("Cluster Error", Arrays.asList("Could not save cluster for the first time"));
+                }
+            }
+                    
+            var workers = existingCluster.getWorkers() == null ;
+            
+            // perform insert operation
+            var inserted = this.workers.insertOne(session, worker);
+            
+            // could not insert
+            if(inserted.getInsertedId() == null){
+                throw new SchedulerDataException("Worker Not Saved", Arrays.asList("The worker was not saved"));
+            }
+            
+            // get saved object if available
+            var savedOne = this.workers.find(session, this.hasId(newId)).first();
+            
+            // something went wrong and saved entity is missing
+            if(savedOne == null){
+                throw new SchedulerDataException("Worker Missing", Arrays.asList("The worker was not saved"));
+            }
+            
+            // return inserted
+            return savedOne;
+        })); 
+    }
+    
+    /**
      * Updates a worker in the data store
      * 
      * @param id The id of worker session
@@ -1567,22 +1670,22 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         var issues = new ArrayList<String>();
         
         // name does not match the required criteria
-        if(Str.blank(input.getName()) || !NAME_REGEX.asMatchPredicate().test(input.getName())){
+        if(Str.blank(input.getName()) || !Jobs.NAME_REGEX.asMatchPredicate().test(input.getName())){
             issues.add("The job name is blank or contains invalid characters");
         }
         
         // folder does not match the required criteria
-        if(Str.blank(input.getFolder()) || !FOLDER_REGEX.asMatchPredicate().test(input.getFolder())){
+        if(Str.blank(input.getFolder()) || !Jobs.FOLDER_REGEX.asMatchPredicate().test(input.getFolder())){
             issues.add("The job folder is blank or contains invalid characters");
         }
         
         // cluster does not match the required criteria
-        if(Str.blank(input.getCluster()) || !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
+        if(Str.blank(input.getCluster()) || !Clusters.CLUSTER_REGEX.asMatchPredicate().test(input.getCluster())){
             issues.add("The job cluster is blank or contains invalid characters");
         }
         
         // type does not match the required criteria
-        if(Str.blank(input.getType()) || !NAME_REGEX.asMatchPredicate().test(input.getType())){
+        if(Str.blank(input.getType()) || !Jobs.TYPE_REGEX.asMatchPredicate().test(input.getType())){
             issues.add("The job type is blank or contains invalid characters");
         }
         
@@ -1601,7 +1704,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         triggers.forEach(trigger -> {
             
             // trigger name does not match the required criteria
-            if(Str.blank(trigger.getName()) || !NAME_REGEX.asMatchPredicate().test(trigger.getName())){
+            if(Str.blank(trigger.getName()) || !Jobs.NAME_REGEX.asMatchPredicate().test(trigger.getName())){
                 issues.add("The trigger name is blank or contains invalid characters");
             }
             
@@ -1636,7 +1739,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // if cluster override value is given but is malformed report issue
-        if(!Str.blank(input.getCluster()) && !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
+        if(!Str.blank(input.getCluster()) && !Clusters.CLUSTER_REGEX.asMatchPredicate().test(input.getCluster())){
             issues.add("The job cluster override value is given but contains invalid characters");
         }
         

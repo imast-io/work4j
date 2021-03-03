@@ -34,6 +34,16 @@ public class ClusterWorker implements Serializable {
     private String session;
     
     /**
+     * Checks if persistence is enabled
+     */
+    private boolean persistence;
+    
+    /**
+     * The persistence method value for reference only
+     */
+    private String persistenceMethod;
+    
+    /**
      * The last check-in activity
      */
     private WorkerActivity activity;

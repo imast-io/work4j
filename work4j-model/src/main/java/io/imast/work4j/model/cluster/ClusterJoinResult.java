@@ -17,5 +17,29 @@ import lombok.NoArgsConstructor;
 @Builder(toBuilder = true)
 public class ClusterJoinResult implements Serializable {
     
+    /**
+     * The identifier of cluster 
+     */
     private String id;
+    
+    /**
+     * The name of cluster
+     */
+    private String cluster;
+    
+    /**
+     * The effective name of worker
+     */
+    private String worker;
+    
+    /**
+     * The maximum idle time for the given 
+     */
+    private long maxIdle;
+    
+    /**
+     * The flag to identify if join request was successful 
+     */
+    private boolean joined;
+    
 }

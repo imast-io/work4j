@@ -2,6 +2,7 @@ package io.imast.work4j.model.cluster;
 
 import java.io.Serializable;
 import java.util.Date;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -32,6 +33,11 @@ public class ClusterDefinition implements Serializable {
      * The cluster name
      */
     private String cluster;
+    
+    /**
+     * The list of workers
+     */
+    private List<ClusterWorker> workers;
     
     /**
      * The maximum idle time 
