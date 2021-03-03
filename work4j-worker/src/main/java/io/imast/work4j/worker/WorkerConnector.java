@@ -3,8 +3,8 @@ package io.imast.work4j.worker;
 import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
-import io.imast.work4j.model.worker.Worker;
-import io.imast.work4j.model.worker.WorkerInput;
+import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.WorkerInput;
 import io.vavr.control.Try;
 import lombok.extern.slf4j.Slf4j;
 

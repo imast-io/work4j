@@ -9,7 +9,7 @@ import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.channel.worker.WorkerMessage;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionStatus;
-import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.cluster.Worker;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
@@ -173,7 +173,7 @@ public class PollingWorkerListener implements WorkerListener {
     protected void syncIndex(List<ExecutionIndexEntry> entries) throws WorkerException {
 
         // check if no groups
-        if(entries == null || entries.isEmpty()){
+        if(entries == null){
             return;
         }
 

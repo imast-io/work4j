@@ -29,9 +29,9 @@ import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.IterationsResponse;
-import io.imast.work4j.model.worker.WorkerActivity;
-import io.imast.work4j.model.worker.Worker;
-import io.imast.work4j.model.worker.WorkerInput;
+import io.imast.work4j.model.cluster.WorkerActivity;
+import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.WorkerInput;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -47,7 +47,8 @@ import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import io.imast.work4j.data.SchedulerDataRepository;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
-import io.imast.work4j.model.worker.WorkerHeartbeat;
+import io.imast.work4j.model.cluster.WorkerHeartbeat;
+import java.util.HashMap;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -810,12 +811,14 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             if(execution.getStatus() == ExecutionStatus.COMPLETED && validInput.getStatus() != ExecutionStatus.COMPLETED){
                 throw new SchedulerDataException("Wrong Status", Arrays.asList("The completed execution cannot be updated"));
             }
-                        
+                
             // the update fields
-            Map updateFields = Map.of(
-                    "modified", new Date(), 
-                    "status", validInput.getStatus() == null ? null : validInput.getStatus().name(), 
-                    "completionSeverity", validInput.getSeverity() == null ? null : validInput.getSeverity().name());
+            var updateFields = new HashMap<String, Object>();
+            
+            // fill in fields
+            updateFields.put("modified", new Date());
+            updateFields.put("status", validInput.getStatus() == null ? null : validInput.getStatus().name());
+            updateFields.put("completionSeverity", validInput.getSeverity() == null ? null : validInput.getSeverity().name());
             
             // the update entity
             var updateEntity = new Document("$set", new Document(updateFields));

@@ -6,7 +6,7 @@ import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
-import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.cluster.Worker;
 import io.imast.work4j.worker.ClusteringType;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.WorkerConfiguration;
@@ -250,7 +250,7 @@ public class WorkerControllerBuilder {
         
         // the scheduler object
         var scheduler = tryScheduler.get();
-        
+
         // initialize context modules of scheduler
         try {
             scheduler.getContext().put(JobConstants.WORKER_FACTORY, this.factory);

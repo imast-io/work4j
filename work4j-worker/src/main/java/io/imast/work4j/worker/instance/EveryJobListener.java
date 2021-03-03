@@ -5,7 +5,7 @@ import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.JobOptions;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
-import io.imast.work4j.model.worker.Worker;
+import io.imast.work4j.model.cluster.Worker;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.job.JobOps;
 import java.util.Date;

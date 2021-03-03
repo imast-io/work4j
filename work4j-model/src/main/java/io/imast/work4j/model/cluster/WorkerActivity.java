@@ -1,4 +1,4 @@
-package io.imast.work4j.model.worker;
+package io.imast.work4j.model.cluster;
 
 /**
  * The types of worker activities

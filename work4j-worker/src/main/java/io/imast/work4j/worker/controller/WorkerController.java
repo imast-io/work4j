@@ -4,11 +4,12 @@ import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.channel.worker.WorkerExecutionCompleted;
 import io.imast.work4j.channel.worker.WorkerExecutionCreated;
 import io.imast.work4j.channel.worker.WorkerExecutionPaused;
+import io.imast.work4j.channel.worker.WorkerExecutionResumed;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.channel.worker.WorkerMessage;
-import io.imast.work4j.model.worker.Worker;
-import io.imast.work4j.model.worker.WorkerActivity;
-import io.imast.work4j.model.worker.WorkerHeartbeat;
+import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.WorkerActivity;
+import io.imast.work4j.model.cluster.WorkerHeartbeat;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
@@ -153,17 +154,17 @@ public class WorkerController {
             // cast to concrete type
             var msg = (WorkerExecutionPaused) message;
             
-            // pause
+            // pause execution of all triggers by job key
             this.instance.pause(new ExecutionKey(msg.getExecutionId(), msg.getJobId()));
         }
        
         // an execution is resumed so needs to be resumed in scheduler instance
-        if(message instanceof WorkerExecutionPaused){
+        if(message instanceof WorkerExecutionResumed){
             
             // cast to concrete type
-            var msg = (WorkerExecutionPaused) message;
+            var msg = (WorkerExecutionResumed) message;
             
-            // pause
+            // resume execution of all triggers by job key
             this.instance.resume(new ExecutionKey(msg.getExecutionId(), msg.getJobId()));
         }
     }

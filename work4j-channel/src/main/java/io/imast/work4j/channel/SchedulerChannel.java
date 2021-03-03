@@ -5,9 +5,9 @@ import io.imast.work4j.model.execution.CompletionSeverity;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
-import io.imast.work4j.model.worker.Worker;
-import io.imast.work4j.model.worker.WorkerHeartbeat;
-import io.imast.work4j.model.worker.WorkerInput;
+import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.WorkerHeartbeat;
+import io.imast.work4j.model.cluster.WorkerInput;
 import java.util.List;
 import reactor.core.publisher.Mono;
 
