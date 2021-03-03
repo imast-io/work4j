@@ -18,11 +18,6 @@ import lombok.NoArgsConstructor;
 public class ClusterJoinInput implements Serializable {
     
     /**
-     * The tenant reference
-     */
-    private String tenant;
-    
-    /**
      * The cluster reference
      */
     private String cluster;
@@ -36,6 +31,16 @@ public class ClusterJoinInput implements Serializable {
      * The session of worker
      */
     private String session;
+    
+    /**
+     * Checks if persistence is enabled
+     */
+    private boolean persistence;
+    
+    /**
+     * The persistence method value for reference only
+     */
+    private String persistenceMethod;
     
     /**
      * The joining worker kind
