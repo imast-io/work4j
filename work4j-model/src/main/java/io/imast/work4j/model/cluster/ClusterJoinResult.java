@@ -1,12 +1,13 @@
-package io.imast.work4j.model.worker;
+package io.imast.work4j.model.cluster;
 
+import java.io.Serializable;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * The worker heartbeat info
+ * The result of joining the cluster
  * 
  * @author davitp
  */
@@ -14,10 +15,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder(toBuilder = true)
-public class WorkerHeartbeat {
+public class ClusterJoinResult implements Serializable {
     
-    /**
-     * The last activity in the session
-     */
-    private WorkerActivity activity;
+    private String id;
 }
