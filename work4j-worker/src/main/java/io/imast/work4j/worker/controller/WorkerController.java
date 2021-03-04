@@ -97,7 +97,7 @@ public class WorkerController {
         }
         
         // heartbeat with given frequency
-        this.asyncExecutor.scheduleAtFixedRate(() -> this.heartbeat(), 0, this.config.getHeartbeatRate(), TimeUnit.MILLISECONDS);
+        this.asyncExecutor.scheduleAtFixedRate(() -> this.heartbeat(), 0, (this.config.getHeartbeatRate() * 90) / 100, TimeUnit.MILLISECONDS);
     }
     
     /**

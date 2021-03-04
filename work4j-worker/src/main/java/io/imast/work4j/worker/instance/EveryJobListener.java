@@ -5,7 +5,7 @@ import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.model.JobOptions;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
-import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.ClusterWorker;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.job.JobOps;
 import java.util.Date;
@@ -25,7 +25,7 @@ public class EveryJobListener implements JobListener {
     /**
      * The worker instance
      */
-    protected final Worker worker;
+    protected final ClusterWorker worker;
     
     /**
      * The scheduler channel
@@ -38,7 +38,7 @@ public class EveryJobListener implements JobListener {
      * @param worker The worker instance
      * @param schedulerChannel The worker channel
      */
-    public EveryJobListener(Worker worker, SchedulerChannel schedulerChannel) {
+    public EveryJobListener(ClusterWorker worker, SchedulerChannel schedulerChannel) {
         this.worker = worker;
         this.schedulerChannel = schedulerChannel;   
     }
@@ -110,7 +110,7 @@ public class EveryJobListener implements JobListener {
         var iteration = IterationInput.builder()
                 .executionId(executionId)
                 .jobId(jobId)
-                .workerId("FIXME")
+                .worker(this.worker.getName())
                 .runtime(runtime)
                 .status(status)
                 .payload(Lang.safeCast(output))

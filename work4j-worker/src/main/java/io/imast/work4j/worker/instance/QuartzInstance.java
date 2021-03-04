@@ -324,11 +324,8 @@ public class QuartzInstance {
         systemData.put(JobConstants.PAYLOAD_JOB_NAME, execution.getName());
         systemData.put(JobConstants.PAYLOAD_JOB_FOLDER, execution.getFolder());
         systemData.put(JobConstants.PAYLOAD_JOB_TYPE, execution.getType());
-        systemData.put(JobConstants.PAYLOAD_JOB_TENANT, execution.getTenant());
-        systemData.put(JobConstants.PAYLOAD_JOB_STATUS, execution.getStatus());
         systemData.put(JobConstants.PAYLOAD_JOB_CLUSTER, execution.getCluster());
         systemData.put(JobConstants.PAYLOAD_JOB_OPTIONS, execution.getOptions());
-        systemData.put(JobConstants.PAYLOAD_JOB_MODIFIED, execution.getModified());
         
         // add all system data
         job.getJobDataMap().putAll(systemData);

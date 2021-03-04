@@ -18,6 +18,11 @@ public enum PersistenceType {
     MYSQL,
     
     /**
+     * The PostgresSQL-based persistence
+     */
+    POSTGRES,
+    
+    /**
      * The MSSQL-based persistence
      */
     MSSQL,
@@ -25,5 +30,10 @@ public enum PersistenceType {
     /**
      * The Oracle-based persistence
      */
-    ORACLE
+    ORACLE,
+    
+    /**
+     * The WebLogic-based persistence
+     */
+    WEBLOGIC
 }
