@@ -8,7 +8,6 @@ import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
 import io.imast.work4j.model.cluster.ClusterWorker;
 import io.imast.work4j.model.cluster.WorkerKind;
-import io.imast.work4j.worker.ClusteringType;
 import io.imast.work4j.worker.JobConstants;
 import io.imast.work4j.worker.PersistenceType;
 import io.imast.work4j.worker.WorkerConfiguration;
@@ -36,7 +35,30 @@ import org.quartz.impl.StdSchedulerFactory;
  * @author davitp
  */
 public class WorkerControllerBuilder {
-   
+    
+    /**
+     * The mapping of JDBS-based persistence types and their delegates
+     */
+    private static final Map<PersistenceType, String> JDBC_DELEGATES = Map.of(
+            PersistenceType.MYSQL, "org.quartz.impl.jdbcjobstore.StdJDBCDelegate",
+            PersistenceType.MSSQL, "org.quartz.impl.jdbcjobstore.MSSQLDelegate",
+            PersistenceType.POSTGRES, "org.quartz.impl.jdbcjobstore.PostgreSQLDelegate",
+            PersistenceType.ORACLE, "org.quartz.impl.jdbcjobstore.oracle.OracleDelegate",
+            PersistenceType.WEBLOGIC, "org.quartz.impl.jdbcjobstore.WebLogicDelegate"      
+    );
+    
+    /**
+     * The mapping of JDBS-based persistence types and their drivers
+     */
+    private static final Map<PersistenceType, String> JDBC_DRIVERS = Map.of(
+            PersistenceType.MYSQL, "com.mysql.jdbc.Driver",
+            PersistenceType.MSSQL, "com.microsoft.sqlserver.jdbc.SQLServerDriver",
+            PersistenceType.POSTGRES, "org.postgresql.Driver",
+            PersistenceType.ORACLE, "oracle.jdbc.driver.OracleDriver",
+            PersistenceType.WEBLOGIC, "weblogic.jdbc.pool.Driver"      
+    );
+    
+    
     /**
      * The instance to configuration
      */
@@ -199,32 +221,30 @@ public class WorkerControllerBuilder {
             props.setProperty("org.quartz.scheduler.clusterCheckinInterval ", Long.toString(this.worker.getMaxIdle()));
         }
         
-        // persistance enabled
-        var persist = this.config.getPersistenceType() != PersistenceType.NO;
+        // check if JDBC persistence
+        var isJdbc = JDBC_DELEGATES.containsKey(this.config.getPersistenceType());
         
         // should set persistance-related attributes
-        if(persist){
+        if(isJdbc){
+
             // prefix for data store property
             var dsPropPrefix = String.format("org.quartz.dataSource.%s", this.config.getDataSource());
+
             
             // data store properties
-            props.setProperty(String.format("%s.%s", dsPropPrefix, "driver"), "com.mysql.jdbc.Driver");
+            props.setProperty(String.format("%s.%s", dsPropPrefix, "driver"), JDBC_DRIVERS.get(this.config.getPersistenceType()));
             props.setProperty(String.format("%s.%s", dsPropPrefix, "URL"), this.config.getDataSourceUri());
             props.setProperty(String.format("%s.%s", dsPropPrefix, "user"), this.config.getDataSourceUsername());
             props.setProperty(String.format("%s.%s", dsPropPrefix, "password"), this.config.getDataSourcePassword());
-            props.setProperty(String.format("%s.%s", dsPropPrefix, "maxConnections"), "30");
+            props.setProperty(String.format("%s.%s", dsPropPrefix, "maxConnections"), "100");
             
             // set store's data source
             props.setProperty("org.quartz.jobStore.dataSource", this.config.getDataSource());
-        }
-        
-        // if JDBC clustering
-        if(this.config.getClusteringType() == ClusteringType.JDBC){
             props.setProperty("org.quartz.jobStore.tablePrefix", "QRTZ_");
             props.setProperty("org.quartz.jobStore.class", "org.quartz.impl.jdbcjobstore.JobStoreTX");
-            props.setProperty("org.quartz.jobStore.driverDelegateClass", "org.quartz.impl.jdbcjobstore.StdJDBCDelegate");            
+            props.setProperty("org.quartz.jobStore.driverDelegateClass", JDBC_DELEGATES.get(this.config.getPersistenceType()));        
         }
-        
+              
         return props;
     }
     
@@ -350,8 +370,8 @@ public class WorkerControllerBuilder {
         allListeners.addAll(this.listeners);
         
         // in case of standalone scheduler at least one listener should be there
-        if(this.config.getClusteringType() == ClusteringType.STANDALONE){
-            throw new WorkerException("Standalone scheduling needs at least one listener or a positive polling rate");
+        if(this.config.getPersistenceType() == PersistenceType.NO){
+            throw new WorkerException("Workers without persistence needs at least one external listener or a positive polling rate");
         }
         
         return new WorkerController(this.worker, instance, this.schedulerChannel, allListeners, this.config);

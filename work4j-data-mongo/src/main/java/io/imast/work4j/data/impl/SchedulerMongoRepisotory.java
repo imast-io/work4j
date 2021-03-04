@@ -141,11 +141,20 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
             // index executions by name
             this.executions.createIndex(Indexes.ascending("name"), new IndexOptions().name("executions_by_name"));
             
+            // index executions by job id
+            this.executions.createIndex(Indexes.ascending("jobId"), new IndexOptions().name("executions_by_jobId"));
+            
             // index executions by update time
             this.executions.createIndex(Indexes.descending("modified"), new IndexOptions().name("executions_by_modified"));
             
             // index iterations by timestamp for easy paging
             this.iterations.createIndex(Indexes.descending("timestamp"), new IndexOptions().name("iteration_by_timestamp_desc"));
+            
+            // index iterations by execution id for easy filtering
+            this.iterations.createIndex(Indexes.ascending("executionId"), new IndexOptions().name("iteration_by_exec_id_desc"));
+            
+            // index clusters by "cluster" value to ensure uniqueness
+            this.clusters.createIndex(Indexes.ascending("cluster"), new IndexOptions().name("clusters_by_cluster_unique").unique(true));
 
         }
         catch (Throwable e){
@@ -1050,8 +1059,8 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // make sure worker id is provided
-        if(Str.blank(input.getWorkerId())){
-            validation.add("The session id is mandatory for iteration");
+        if(Str.blank(input.getWorker())){
+            validation.add("The worker name is mandatory for iteration");
         }
         
         // make sure status is given
@@ -1075,7 +1084,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
                     .id(newId)
                     .jobId(input.getJobId())
                     .executionId(input.getExecutionId())
-                    .workerId(input.getWorkerId())
+                    .worker(input.getWorker())
                     .status(input.getStatus())
                     .message(input.getMessage())
                     .payload(input.getPayload())

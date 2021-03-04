@@ -16,12 +16,7 @@ public class JobConstants {
      * The job session context
      */
     public static final String JOB_SESSION_CONTEXT = "SESSION";
-    
-    /**
-     * The job definition
-     */
-    public static final String JOB_DEFINITION = "DEFINITION";
-    
+        
     /**
      * The job execution id key
      */
@@ -48,16 +43,6 @@ public class JobConstants {
     public static final String PAYLOAD_JOB_TYPE = "_PLD_JOB_TYPE";
     
     /**
-     * The job tenant key
-     */
-    public static final String PAYLOAD_JOB_TENANT = "_PLD_JOB_TENANT";
-    
-    /**
-     * The job status key
-     */
-    public static final String PAYLOAD_JOB_STATUS = "_PLD_JOB_STATUS";
-    
-    /**
      * The job cluster key
      */
     public static final String PAYLOAD_JOB_CLUSTER = "_PLD_JOB_CLUSTER";
@@ -66,12 +51,7 @@ public class JobConstants {
      * The job execution options key
      */
     public static final String PAYLOAD_JOB_OPTIONS = "_PLD_JOB_OPTIONS";
-    
-    /**
-     * The job modified key
-     */
-    public static final String PAYLOAD_JOB_MODIFIED = "_PLD_JOB_MODIFIED";
-    
+        
     /**
      * The job modules
      */

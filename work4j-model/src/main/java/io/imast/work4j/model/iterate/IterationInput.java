@@ -31,7 +31,7 @@ public class IterationInput {
     /**
      * The worker the iteration was executed in
      */
-    private String workerId;
+    private String worker;
     
     /**
      * The status of performed iteration 

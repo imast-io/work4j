@@ -51,7 +51,18 @@ public class WorkerConnector {
         
         // if name is not given use a random name
         if(Str.blank(name)){
-            name = String.format("WRK-%s", Str.random(6));
+            
+            if(this.config.getClusteringType() == ClusteringType.EXCLUSIVE){
+                name = "EXCLUSIVE";
+            }
+            
+            if(this.config.getClusteringType() == ClusteringType.BALANCED){
+                name = "BALANCED";
+            }
+            
+            if(this.config.getClusteringType() == ClusteringType.REPLICA){
+                name = String.format("REPLICA-%s", Str.random(3));
+            }
         }
         
         // get the cluster name (use default if not given from configuration)
