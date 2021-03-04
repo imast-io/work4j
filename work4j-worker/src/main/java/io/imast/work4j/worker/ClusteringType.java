@@ -1,19 +1,24 @@
 package io.imast.work4j.worker;
 
 /**
- * The type of agent clustering
+ * The type of worker clustering
  * 
  * @author davitp
  */
 public enum ClusteringType {
     
     /**
-     * Non-clustered single node agent
+     * The exclusive member of cluster
      */
-    STANDALONE,
+    EXCLUSIVE,
     
     /**
-     * The JDBC-backed database clustering
+     * The replica member of cluster
      */
-    JDBC
+    REPLICA,
+    
+    /**
+     * The balanced member of cluster
+     */
+    BALANCED
 }

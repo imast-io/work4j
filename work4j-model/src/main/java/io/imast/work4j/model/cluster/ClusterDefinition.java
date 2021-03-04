@@ -25,11 +25,6 @@ public class ClusterDefinition implements Serializable {
     private String id;
     
     /**
-     * The tenant of cluster
-     */
-    private String tenant;
-    
-    /**
      * The cluster name
      */
     private String cluster;

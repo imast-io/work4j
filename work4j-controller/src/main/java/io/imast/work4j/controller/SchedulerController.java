@@ -5,6 +5,10 @@ import io.imast.work4j.data.exception.SchedulerDataException;
 import io.imast.work4j.model.JobDefinition;
 import io.imast.work4j.model.JobDefinitionInput;
 import io.imast.work4j.model.JobRequestResult;
+import io.imast.work4j.model.cluster.ClusterDefinition;
+import io.imast.work4j.model.cluster.ClusterWorker;
+import io.imast.work4j.model.cluster.WorkerHeartbeat;
+import io.imast.work4j.model.cluster.WorkerJoinInput;
 import io.imast.work4j.model.execution.ExecutionStatus;
 import io.imast.work4j.model.execution.ExecutionUpdateInput;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
@@ -15,9 +19,6 @@ import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.IterationsResponse;
-import io.imast.work4j.model.cluster.Worker;
-import io.imast.work4j.model.cluster.WorkerHeartbeat;
-import io.imast.work4j.model.cluster.WorkerInput;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
@@ -48,14 +49,13 @@ public class SchedulerController  {
     /**
      * Gets all the job definitions
      * 
-     * @param tenant The target tenant
      * @param cluster The cluster to filter
      * @param type The type of jobs
      * @return Returns set of all job definitions
      * @throws SchedulerDataException
      */
-    public List<JobDefinition> getAllJobs(String tenant, String cluster, String type) throws SchedulerDataException {
-        return this.data.getAllJobs(tenant, cluster, type);
+    public List<JobDefinition> getAllJobs(String cluster, String type) throws SchedulerDataException {
+        return this.data.getAllJobs(cluster, type);
     }
     
     /**
@@ -72,7 +72,6 @@ public class SchedulerController  {
     /**
      * Get the page of job definitions sorted by code
      * 
-     * @param tenant The target tenant
      * @param cluster The cluster to filter
      * @param type The type of jobs
      * @param page The page number
@@ -80,8 +79,8 @@ public class SchedulerController  {
      * @return Returns a page of job definitions
      * @throws SchedulerDataException
      */
-    public JobRequestResult getJobPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException {
-        return this.data.getJobPage(tenant, cluster, type, page, size);
+    public JobRequestResult getJobPage(String cluster, String type, int page, int size) throws SchedulerDataException {
+        return this.data.getJobPage(cluster, type, page, size);
     }
     
     /**
@@ -144,14 +143,13 @@ public class SchedulerController  {
     /**
      * Gets all the job executions
      * 
-     * @param tenant The tenant to filter
      * @param cluster The optional target cluster to filter
      * @param type The optional type to filter by 
      * @return Returns set of all job executions
      * @throws SchedulerDataException
      */
-    public List<JobExecution> getAllExecutions(String tenant, String cluster, String type) throws SchedulerDataException {
-        return this.data.getAllExecutions(tenant, cluster, type);
+    public List<JobExecution> getAllExecutions(String cluster, String type) throws SchedulerDataException {
+        return this.data.getAllExecutions(cluster, type);
     }
     
     /**
@@ -179,7 +177,6 @@ public class SchedulerController  {
     /**
      * Gets the page of executions in the system
      * 
-     * @param tenant The tenant to filter
      * @param cluster The optional target cluster to filter
      * @param type The optional type to filter by
      * @param page The page number 
@@ -187,19 +184,18 @@ public class SchedulerController  {
      * @return Returns page of executions
      * @throws SchedulerDataException
      */
-    public ExecutionsResponse getExecutionsPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException {
-        return this.data.getExecutionsPage(tenant, cluster, type, page, size);
+    public ExecutionsResponse getExecutionsPage(String cluster, String type, int page, int size) throws SchedulerDataException {
+        return this.data.getExecutionsPage(cluster, type, page, size);
     }
     
     /**
      * Gets the set of execution index entries based on query
      * 
-     * @param tenant The tenant to filter
      * @param cluster The cluster to filter
      * @return Returns set of execution entries
      */
-    public List<ExecutionIndexEntry> getExecutionIndex(String tenant, String cluster) throws SchedulerDataException {
-        return this.data.getExecutionIndex(tenant, cluster);
+    public List<ExecutionIndexEntry> getExecutionIndex(String cluster) throws SchedulerDataException {
+        return this.data.getExecutionIndex(cluster);
     }
     
     /**
@@ -403,92 +399,66 @@ public class SchedulerController  {
     }
     
     /**
-     * Gets all the workers
+     * Gets all the clusters
      * 
-     * @return Returns set of all workers
+     * @return Returns set of all clusters
      * @throws SchedulerDataException
      */
-    public List<Worker> getAllWorkers() throws SchedulerDataException {
-        return this.data.getAllWorkers();
+    public List<ClusterDefinition> getAllClusters() throws SchedulerDataException{
+        return this.data.getAllClusters();
     }
     
     /**
-     * Gets the set of workers within a cluster
+     * Gets the cluster by identifier
      * 
-     * @param cluster The cluster to filter
-     * @return Returns set of cluster workers
+     * @param id The cluster definition id
+     * @return Returns cluster definition if found
      * @throws SchedulerDataException
      */
-    public List<Worker> getAllWorkers(String cluster) throws SchedulerDataException {
-       return this.data.getAllWorkers(cluster);
+    public Optional<ClusterDefinition> getClusterById(String id) throws SchedulerDataException{
+        return this.data.getClusterById(id);
     }
     
     /**
-     * Gets the worker by identifier
+     * Join the worker to the cluster
      * 
-     * @param id The agent definition id
-     * @return Returns agent definition if found
+     * @param input The worker joining input
+     * @return Returns result of operation
      * @throws SchedulerDataException
      */
-    public Optional<Worker> getWorkerById(String id) throws SchedulerDataException {
-        return this.data.getWorkerById(id);
-    }
-    
-    /**
-     * Inserts a worker into the data store
-     * 
-     * @param input The worker input
-     * @return Returns saved worker
-     * @throws SchedulerDataException
-     */
-    public Worker insertWorker(WorkerInput input) throws SchedulerDataException {
-        return this.data.insertWorker(input);
+    public ClusterWorker joinWorker(WorkerJoinInput input) throws SchedulerDataException{
+        return this.data.joinWorker(input);
     }
     
     /**
      * Updates a worker in the data store
      * 
-     * @param id The id of worker session
      * @param heartbeat The heartbeat to update
      * @return Returns saved worker 
      * @throws SchedulerDataException
      */
-    public Worker updateWorker(String id, WorkerHeartbeat heartbeat) throws SchedulerDataException {
-        return this.data.updateWorker(id, heartbeat);
+    public ClusterWorker updateWorker(WorkerHeartbeat heartbeat) throws SchedulerDataException{
+        return this.data.updateWorker(heartbeat);
     }
     
-    /**
-     * Deletes all the idle workers for the given cluster and machine
-     * 
-     * @param cluster The cluster to filter
-     * @param name The name of machine to remove
-     * @return Returns number of deleted sessions
-     * @throws SchedulerDataException
-     */
-    public long deleteIdleWorkers(String cluster, String name) throws SchedulerDataException {
-        return this.data.deleteIdleWorkers(cluster, name);
-    }
-    
-    /**
-     * Deletes all the workers for the given cluster and machine
-     * 
-     * @param cluster The cluster to filter
-     * @param name The name of machine to remove
-     * @return Returns number of deleted sessions
-     * @throws SchedulerDataException
-     */
-    public long deleteWorkers(String cluster, String name) throws SchedulerDataException {
-        return this.data.deleteWorkers(cluster, name);
-    }
-       
     /**
      * Deletes an entry by id and returns deleted one
      * 
-     * @param id The id of worker to delete
-     * @return Returns deleted worker item
+     * @param id The id of cluster to delete
+     * @return Returns deleted cluster item
      * @throws SchedulerDataException
      */
-    public Optional<Worker> deleteWorkerById(String id) throws SchedulerDataException {
-        return this.data.getWorkerById(id);
+    public Optional<ClusterDefinition> deleteClusterById(String id) throws SchedulerDataException{
+        return this.data.getClusterById(id);
+    }
+    
+    /**
+     * Deletes all the clusters in the system
+     * 
+     * @return Returns number of deleted items
+     * @throws SchedulerDataException
+     */
+    public long deleteAllClusters() throws SchedulerDataException {
+        return this.data.deleteAllClusters();
     }
 }

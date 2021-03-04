@@ -6,7 +6,6 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import static com.mongodb.client.model.Filters.and;
 import static com.mongodb.client.model.Filters.eq;
-import static com.mongodb.client.model.Filters.expr;
 import static com.mongodb.client.model.Filters.in;
 import static com.mongodb.client.model.Filters.lt;
 import com.mongodb.client.model.IndexOptions;
@@ -14,6 +13,7 @@ import com.mongodb.client.model.Indexes;
 import static com.mongodb.client.model.Projections.fields;
 import static com.mongodb.client.model.Projections.include;
 import static com.mongodb.client.model.Sorts.descending;
+import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.work4j.data.exception.SchedulerDataException;
 import io.imast.work4j.model.JobDefinition;
@@ -29,10 +29,7 @@ import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
 import io.imast.work4j.model.iterate.IterationStatus;
 import io.imast.work4j.model.iterate.IterationsResponse;
-import io.imast.work4j.model.cluster.WorkerActivity;
-import io.imast.work4j.model.cluster.Worker;
-import io.imast.work4j.model.cluster.WorkerInput;
-import java.util.ArrayList;
+import io.imast.work4j.model.cluster.WorkerActivity;import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashSet;
@@ -40,21 +37,21 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 import org.bson.BsonDocument;
 import org.bson.Document;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 import io.imast.work4j.data.SchedulerDataRepository;
 import io.imast.work4j.model.Jobs;
-import io.imast.work4j.model.Tenants;
 import io.imast.work4j.model.cluster.ClusterDefinition;
-import io.imast.work4j.model.cluster.ClusterJoinInput;
-import io.imast.work4j.model.cluster.ClusterJoinResult;
+import io.imast.work4j.model.cluster.WorkerJoinInput;
+import io.imast.work4j.model.cluster.ClusterWorker;
 import io.imast.work4j.model.cluster.Clusters;
-import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.cluster.WorkerHeartbeat;
+import io.imast.work4j.model.cluster.WorkerKind;
+import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import java.util.HashMap;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -69,12 +66,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
      * The table prefix for the source collections
      */
     protected static final String COLLECTION_PREFIX = "work4j";
-    
-    /**
-     * The worker regex pattern
-     */
-    protected static Pattern WORKER_NAME_REGEX = Pattern.compile("^[a-zA-Z0-9_-]+$");
-    
+        
     /**
      * The mongo database client
      */
@@ -164,14 +156,13 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     /**
      * Gets all the job definitions
      * 
-     * @param tenant The target tenant
      * @param cluster The cluster to filter
      * @param type The type of jobs
      * @return Returns set of all job definitions
      * @throws SchedulerDataException
      */
     @Override
-    public List<JobDefinition> getAllJobs(String tenant, String cluster, String type) throws SchedulerDataException {
+    public List<JobDefinition> getAllJobs(String cluster, String type) throws SchedulerDataException {
         
         // the target filters
         var filters = new ArrayList<Bson>();
@@ -180,12 +171,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         if(!Str.blank(type)){
             filters.add(eq("type", type));
         }
-        
-        // add tenant filter if given
-        if(!Str.blank(tenant)){
-            filters.add(eq("tenant", tenant));
-        }
-        
+               
         // add cluster filter if given
         if(!Str.blank(cluster)){
             filters.add(eq("cluster", cluster));
@@ -223,7 +209,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     /**
      * Get the page of job definitions sorted by code
      * 
-     * @param tenant The target tenant
      * @param cluster The cluster to filter
      * @param type The type of jobs
      * @param page The page number
@@ -232,7 +217,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
      * @throws SchedulerDataException
      */
     @Override
-    public JobRequestResult getJobPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException {
+    public JobRequestResult getJobPage(String cluster, String type, int page, int size) throws SchedulerDataException {
     
         // the target filters
         var filters = new ArrayList<Bson>();
@@ -241,12 +226,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         if(!Str.blank(type)){
             filters.add(eq("type", type));
         }
-        
-        // add tenant filter if given
-        if(!Str.blank(tenant)){
-            filters.add(eq("tenant", tenant));
-        }
-        
+              
         // add cluster filter if given
         if(!Str.blank(cluster)){
             filters.add(eq("cluster", cluster));
@@ -326,7 +306,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
                     .name(input.getName())
                     .folder(input.getFolder())
                     .type(input.getType())
-                    .tenant(input.getTenant())
                     .cluster(input.getCluster())
                     .triggers(input.getTriggers())
                     .options(input.getOptions())
@@ -486,14 +465,13 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     /**
      * Gets all the job executions
      * 
-     * @param tenant The tenant to filter
      * @param cluster The optional target cluster to filter
      * @param type The optional type to filter by 
      * @return Returns set of all job executions
      * @throws SchedulerDataException
      */
     @Override
-    public List<JobExecution> getAllExecutions(String tenant, String cluster, String type) throws SchedulerDataException {
+    public List<JobExecution> getAllExecutions(String cluster, String type) throws SchedulerDataException {
     
         // the target filters
         var filters = new ArrayList<Bson>();
@@ -501,11 +479,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         // add type filter if given
         if(!Str.blank(type)){
             filters.add(eq("type", type));
-        }
-        
-        // add tenant filter if given
-        if(!Str.blank(tenant)){
-            filters.add(eq("tenant", tenant));
         }
         
         // add cluster filter if given
@@ -567,7 +540,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     /**
      * Gets the page of executions in the system
      * 
-     * @param tenant The tenant to filter
      * @param cluster The optional target cluster to filter
      * @param type The optional type to filter by
      * @param page The page number 
@@ -576,18 +548,13 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
      * @throws SchedulerDataException
      */
     @Override
-    public ExecutionsResponse getExecutionsPage(String tenant, String cluster, String type, int page, int size) throws SchedulerDataException {
+    public ExecutionsResponse getExecutionsPage(String cluster, String type, int page, int size) throws SchedulerDataException {
         // the target filters
         var filters = new ArrayList<Bson>();
         
         // add type filter if given
         if(!Str.blank(type)){
             filters.add(eq("type", type));
-        }
-        
-        // add tenant filter if given
-        if(!Str.blank(tenant)){
-            filters.add(eq("tenant", tenant));
         }
         
         // add cluster filter if given
@@ -619,12 +586,11 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     /**
      * Gets the set of execution index entries based on query
      * 
-     * @param tenant The tenant to filter
      * @param cluster The cluster to filter
      * @return Returns set of execution entries
      */
     @Override
-    public List<ExecutionIndexEntry> getExecutionIndex(String tenant, String cluster) throws SchedulerDataException {
+    public List<ExecutionIndexEntry> getExecutionIndex(String cluster) throws SchedulerDataException {
         
         // check the cluster
         if(Str.blank(cluster)){
@@ -637,11 +603,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         // filter by cluster
         filters.add(eq("cluster", cluster));
         
-        // add tenant filter if given
-        if(!Str.blank(tenant)){
-            filters.add(eq("tenant", tenant));
-        }
-
         // find all elements with filter
         return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
@@ -727,7 +688,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
                     .status(input.getInitialStatus() == null ? ExecutionStatus.ACTIVE : input.getInitialStatus())
                     .completionSeverity(null)
                     .triggers(jobDefinition.getTriggers())
-                    .tenant(jobDefinition.getTenant())
                     .cluster(Str.blank(input.getCluster()) ? jobDefinition.getCluster() : input.getCluster())
                     .options(jobDefinition.getOptions())
                     .payload(payload)
@@ -1253,146 +1213,49 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
     }
     
     /**
-     * Gets all the workers
+     * Gets all the clusters
      * 
-     * @return Returns set of all workers
+     * @return Returns set of all clusters
      * @throws SchedulerDataException
      */
     @Override
-    public List<Worker> getAllWorkers() throws SchedulerDataException {
+    public List<ClusterDefinition> getAllClusters() throws SchedulerDataException {
         // find all elements with filter
         return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
-            return this.workers.find(session, new BsonDocument()).into(new ArrayList<>());
+            return this.clusters.find(session, new BsonDocument()).into(new ArrayList<>());
         }));
     }
-    
+        
     /**
-     * Gets the set of workers within a cluster
+     * Gets the cluster by identifier
      * 
-     * @param cluster The cluster to filter
-     * @return Returns set of cluster workers
+     * @param id The cluster definition id
+     * @return Returns cluster definition if found
      * @throws SchedulerDataException
      */
     @Override
-    public List<Worker> getAllWorkers(String cluster) throws SchedulerDataException {
-        
-        // cluster is required
-        if(Str.blank(cluster)){
-            throw new SchedulerDataException("Missing Cluster", Arrays.asList("The cluster value is required"));
-        }
-        
-        // find all elements with filter
-        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
-            return this.workers.find(session, eq("cluster", cluster)).into(new ArrayList<>());
-        }));
-    }
-    
-    /**
-     * Gets the worker by identifier
-     * 
-     * @param id The agent definition id
-     * @return Returns agent definition if found
-     * @throws SchedulerDataException
-     */
-    @Override
-    public Optional<Worker> getWorkerById(String id) throws SchedulerDataException {
+    public Optional<ClusterDefinition> getClusterById(String id) throws SchedulerDataException {
         
         // id is required
         if(Str.blank(id)){
-            throw new SchedulerDataException("Missing Id", Arrays.asList("Worker ID is required"));
+            throw new SchedulerDataException("Missing Id", Arrays.asList("Cluster ID is required"));
         }
         
         // find all elements with filter
         return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
-            return Optional.ofNullable(this.workers.find(session, this.hasId(id)).first());
+            return Optional.ofNullable(this.clusters.find(session, this.hasId(id)).first());
         }));
     }
-    
-    /**
-     * Inserts a worker into the data store
-     * 
-     * @param input The worker input
-     * @return Returns saved worker
-     * @throws SchedulerDataException
-     */
-    @Override
-    public Worker insertWorker(WorkerInput input) throws SchedulerDataException {
-        
-        // validation log
-        var validation = new ArrayList<String>();
-      
-        // make sure cluster value is fine
-        if(Str.blank(input.getCluster()) || !FOLDER_REGEX.asMatchPredicate().test(input.getCluster())){
-            validation.add("The cluster value is missing or invalid");
-        }
-        
-        // make sure worker value is fine
-        if(Str.blank(input.getName()) || !NAME_REGEX.asMatchPredicate().test(input.getName())){
-            validation.add("The worker value is missing or invalid");
-        }
-        
-        // make sure max idle time is a positive value
-        if(input.getMaxIdle() == null || input.getMaxIdle() <= 0){
-            validation.add("The maximum idle time should be a positive value");
-        }
-                
-        // in case of any issue raise an exception
-        if(!validation.isEmpty()){
-            throw new SchedulerDataException("Invalid Worker", validation);
-        }
-        
-        // new entity id
-        var newId = ObjectId.get().toHexString();
-        
-        // the current time
-        var now = new Date();
-        
-        // do within transaction 
-        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
-            
-            // build new worker to save
-            var worker = Worker.builder()
-                    .id(newId)
-                    .cluster(input.getCluster())
-                    .name(input.getName())
-                    .tenant(input.getTenant())
-                    .maxIdle(input.getMaxIdle())
-                    .created(now)
-                    .updated(now)
-                    .activity(WorkerActivity.REGISTER)
-                    .build();
-                    
-            
-            // perform insert operation
-            var inserted = this.workers.insertOne(session, worker);
-            
-            // could not insert
-            if(inserted.getInsertedId() == null){
-                throw new SchedulerDataException("Worker Not Saved", Arrays.asList("The worker was not saved"));
-            }
-            
-            // get saved object if available
-            var savedOne = this.workers.find(session, this.hasId(newId)).first();
-            
-            // something went wrong and saved entity is missing
-            if(savedOne == null){
-                throw new SchedulerDataException("Worker Missing", Arrays.asList("The worker was not saved"));
-            }
-            
-            // return inserted
-            return savedOne;
-        })); 
-    }
-    
+   
     /**
      * Join the worker to the cluster
      * 
-     * @param tenant The target tenant
      * @param input The worker joining input
      * @return Returns result of operation
      * @throws SchedulerDataException
      */
-    public ClusterJoinResult joinCluster(String tenant, ClusterJoinInput input) throws SchedulerDataException {
+    @Override
+    public ClusterWorker joinWorker(WorkerJoinInput input) throws SchedulerDataException {
         
         // validation log
         var validation = new ArrayList<String>();
@@ -1403,7 +1266,7 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // make sure worker value is fine
-        if(Str.blank(input.getWorker()) || !Clusters.WORKER_REGEX.asMatchPredicate().test(input.getWorker())){
+        if(Str.blank(input.getName()) || !Clusters.WORKER_REGEX.asMatchPredicate().test(input.getName())){
             validation.add("The worker name value is missing or invalid");
         }
         
@@ -1423,82 +1286,41 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         }
         
         // the cluster filter
-        var clusterFilter = and(eq("tenant", Tenants.maybe(tenant)), eq("cluster", input.getCluster()));
-        
-        // new entity id
-        var newId = ObjectId.get().toHexString();
-        
-        // the current time
-        var now = new Date();
+        var clusterFilter = eq("cluster", input.getCluster());
         
         // do within transaction 
         return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // try get existing cluster
-            var existingCluster = this.clusters.find(session, clusterFilter).first();
+            var cluster = this.clusters.find(session, clusterFilter).first();
             
             // check if no cluster with mentioned name
-            if(existingCluster == null){
-                
-                // create new cluster to save
-                var newCluster = ClusterDefinition.builder()
-                        .id(newId)
-                        .cluster(input.getCluster())
-                        .tenant(Tenants.maybe(tenant))
-                        .maxIdle(input.getMaxIdle())
-                        .workers(new ArrayList<>())
-                        .created(now)
-                        .updated(now)
-                        .build();
-                
-                // try insert
-                this.clusters.insertOne(session, newCluster);
-                
-                // get inserted object back
-                existingCluster = this.clusters.find(session, this.hasId(newId)).first();
-                
-                // could not save cluster, something went wrong
-                if(existingCluster == null){
-                    throw new SchedulerDataException("Cluster Error", Arrays.asList("Could not save cluster for the first time"));
-                }
-            }
-                    
-            var workers = existingCluster.getWorkers() == null ;
-            
-            // perform insert operation
-            var inserted = this.workers.insertOne(session, worker);
-            
-            // could not insert
-            if(inserted.getInsertedId() == null){
-                throw new SchedulerDataException("Worker Not Saved", Arrays.asList("The worker was not saved"));
+            if(cluster == null){
+                cluster = this.insertCluster(session, input);
             }
             
-            // get saved object if available
-            var savedOne = this.workers.find(session, this.hasId(newId)).first();
-            
-            // something went wrong and saved entity is missing
-            if(savedOne == null){
-                throw new SchedulerDataException("Worker Missing", Arrays.asList("The worker was not saved"));
-            }
-            
-            // return inserted
-            return savedOne;
+            // return updated
+            return this.joinWorker(session, cluster, input);
         })); 
     }
     
     /**
      * Updates a worker in the data store
      * 
-     * @param id The id of worker session
      * @param heartbeat The heartbeat to update
      * @return Returns saved worker 
      * @throws SchedulerDataException
      */
     @Override
-    public Worker updateWorker(String id, WorkerHeartbeat heartbeat) throws SchedulerDataException {
-        // raise error in case of any issue
-        if(Str.blank(id)){
-            throw new SchedulerDataException("Cannot update", Arrays.asList("Missing worker identifier"));
+    public ClusterWorker updateWorker(WorkerHeartbeat heartbeat) throws SchedulerDataException {
+        // raise error in case missing cluster
+        if(Str.blank(heartbeat.getCluster())){
+            throw new SchedulerDataException("Cannot update", Arrays.asList("Missing cluster name"));
+        }
+        
+        // raise error in case of worker name
+        if(Str.blank(heartbeat.getCluster())){
+            throw new SchedulerDataException("Cannot update", Arrays.asList("Missing worker name"));
         }
         
         // the target activity to update (heartbeat by default)
@@ -1507,144 +1329,84 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
         // do within transaction 
         return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
-            // try get worker to update
-            var worker = this.workers.find(session, this.hasId(id)).first();
+            // get the cluster from storage
+            var cluster = this.clusters.find(session, eq("cluster", heartbeat.getCluster())).first();
             
-            // check if a worker is missing
-            if(worker == null){
-                throw new SchedulerDataException("Missing Worker", Arrays.asList("The target worker is missing"));
-            }
-                        
-            // the update fields
-            Map updateFields = Map.of("updated", new Date(), "activity", activity.name());
-            
-            // the update entity
-            var updateEntity = new Document("$set", new Document(updateFields));
-            
-            // the result of update operation
-            var updateResult = this.workers.updateOne(session, this.hasId(id), updateEntity);
-            
-            // something went wrong while updating
-            if(updateResult.getModifiedCount() != 1){
-                throw new SchedulerDataException("Worker Update Failed", Arrays.asList("The update of worker failed"));
+            // check if cluster is there
+            if(cluster == null){
+                throw new SchedulerDataException("Cannot update", Arrays.asList("Cluster with given name does not exist"));
             }
             
-            // get updated entity
-            var entity = this.workers.find(session, this.hasId(id)).first();
+            // get existing workers
+            List<ClusterWorker> workers = Lang.or(cluster.getWorkers(), () -> new ArrayList<>());
             
-            // something went wrong and updated entity is missing
-            if(entity == null){
-                throw new SchedulerDataException("Worker Update failed", Arrays.asList("The updated worker was not found"));
+            // process all workers
+            var worker = workers.stream().filter(w -> w.getName().equals(heartbeat.getName())).findFirst();
+            
+            // no worker with such name
+            if(!worker.isPresent()){
+                throw new SchedulerDataException("Cannot update", Arrays.asList("Worker with given name does not exist in cluster"));
             }
             
-            return entity;
+            // the current time
+            var now = new Date();
+            
+            // update cluster time
+            cluster.setUpdated(now);
+            
+            // update worker
+            worker.get().setUpdated(now);
+            worker.get().setActivity(activity);
+            
+            // update the cluster
+            this.updateCluster(session, cluster);
+            
+            return worker.get();
         }));
     }
-    
-    /**
-     * Deletes all the idle workers for the given cluster and machine
-     * 
-     * @param cluster The cluster to filter
-     * @param name The name of machine to remove
-     * @return Returns number of deleted sessions
-     * @throws SchedulerDataException
-     */
-    @Override
-    public long deleteIdleWorkers(String cluster, String name) throws SchedulerDataException {
-    
-        // all matchin criterias
-        var filters = new ArrayList<Bson>();
-        
-        // match by cluster if given
-        if(!Str.blank(cluster)){
-            filters.add(eq("cluster", cluster));
-        }
-        
-        // match by name if given
-        if(!Str.blank(cluster)){
-            filters.add(eq("name", name));
-        }
-        
-        // the query will check if last update time + max idle is less than given time
-        var idleQueryTemplate = "{\"$lt\": [{\"$add\": [\"$updated\", \"$maxIdle\"]}, ISODate(\"%s\")]}"; 
-        
-        try {
-            // the idle filter
-            var idleFilter = Document.parse(String.format(idleQueryTemplate, new Date().toInstant().toString()));
-
-            // add idle filter in any case
-            filters.add(expr(idleFilter));
-        }
-        catch(Throwable e){
-            throw new SchedulerDataException("Wrong Query", Arrays.asList("The idle worker query is incorrect"), e);
-        }
-        
-        // delete elements with filter
-        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
-            return this.workers.deleteMany(session, and(filters)).getDeletedCount();
-        }));
-    }
-    /**
-     * Deletes all the workers for the given cluster and machine
-     * 
-     * @param cluster The cluster to filter
-     * @param name The name of machine to remove
-     * @return Returns number of deleted sessions
-     * @throws SchedulerDataException
-     */
-    @Override
-    public long deleteWorkers(String cluster, String name) throws SchedulerDataException {
-        
-        // all matchin criterias
-        var filters = new ArrayList<Bson>();
-        
-        // match by cluster if given
-        if(!Str.blank(cluster)){
-            filters.add(eq("cluster", cluster));
-        }
-        
-        // match by name if given
-        if(!Str.blank(cluster)){
-            filters.add(eq("name", name));
-        }
-        
-        // combined filter
-        var combined = filters.isEmpty() ? new BsonDocument() : and(filters);
-        
-         // delete elements with filter
-        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
-            return this.workers.deleteMany(session, combined).getDeletedCount();
-        }));
-    }
-       
+              
     /**
      * Deletes an entry by id and returns deleted one
      * 
-     * @param id The id of worker to delete
-     * @return Returns deleted worker item
+     * @param id The id of cluster to delete
+     * @return Returns deleted cluster item
      * @throws SchedulerDataException
      */
     @Override
-    public Optional<Worker> deleteWorkerById(String id) throws SchedulerDataException {
+    public Optional<ClusterDefinition> deleteClusterById(String id) throws SchedulerDataException {
         
         // iteration id is required
         if(Str.blank(id)){
-            throw new SchedulerDataException("Missing Worker Id", Arrays.asList("Worker ID is required"));
+            throw new SchedulerDataException("Missing Cluster Id", Arrays.asList("Cluster ID is required"));
         }
 
         // do within transaction 
         return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
             
             // get existing item by id
-            var existing = this.workers.find(session, this.hasId(id)).first();
+            var existing = this.clusters.find(session, this.hasId(id)).first();
             
             // delete if exists
             if(existing != null) {
                 // delete single entity
-                this.workers.deleteOne(session, this.hasId(id));
+                this.clusters.deleteOne(session, this.hasId(id));
             }
             
             return Optional.ofNullable(existing);
+        }));
+    }
+    
+    /**
+     * Deletes all the clusters in the system
+     * 
+     * @return Returns number of deleted items
+     * @throws SchedulerDataException
+     */
+    @Override
+    public long deleteAllClusters() throws SchedulerDataException {
+        // do within transaction 
+        return this.handle(() -> MongoOps.withinSession(this.transactional, this.client, session -> {
+            return this.clusters.deleteMany(session, new BsonDocument()).getDeletedCount();
         }));
     }
     
@@ -1761,7 +1523,6 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
                 .name(input.getName())
                 .folder(input.getFolder())
                 .type(input.getType())
-                .tenant(input.getTenant())
                 .cluster(input.getCluster())
                 .triggers(input.getTriggers())
                 .options(input.getOptions())
@@ -1815,5 +1576,208 @@ public class SchedulerMongoRepisotory implements SchedulerDataRepository {
      */
     protected Bson hasId(String id){
         return eq("_id", id);
+    }
+
+    
+    /**
+     * Creates a new cluster and inserts into the system
+     * 
+     * @param session The client session
+     * @param input The cluster input
+     * @return Returns created cluster 
+     */
+    protected ClusterDefinition insertCluster(ClientSession session, WorkerJoinInput input) throws SchedulerDataException {
+
+        // new entity id
+        var newId = ObjectId.get().toHexString();
+
+        // the now time
+        var now = new Date();
+        
+        // create new cluster to save
+        var newCluster = ClusterDefinition.builder()
+                .id(newId)
+                .cluster(input.getCluster())
+                .maxIdle(input.getMaxIdle())
+                .workers(new ArrayList<>())
+                .created(now)
+                .updated(now)
+                .build();
+
+        // try insert
+        var insertResult = this.clusters.insertOne(session, newCluster);
+
+        // check insert result
+        if(insertResult == null || insertResult.getInsertedId() == null){
+            throw new SchedulerDataException("Cluster Error", Arrays.asList("Cluster was not saved due to internal issue"));
+        }
+        
+        // get inserted object back
+        var existingCluster = this.clusters.find(session, this.hasId(newId)).first();
+
+        // could not save cluster, something went wrong
+        if(existingCluster == null){
+            throw new SchedulerDataException("Cluster Error", Arrays.asList("Could not save cluster for the first time"));
+        }
+        
+        return existingCluster;
+    }
+    
+    /**
+     * Joins the given worker to an existing cluster
+     * 
+     * @param session The client session 
+     * @param cluster The existing cluster to update
+     * @param input The worker join input
+     * @return Returns joined worker
+     */
+    protected ClusterWorker joinWorker(ClientSession session, ClusterDefinition cluster, WorkerJoinInput input) {
+
+        // the current time
+        var now = new Date();
+ 
+        // the max idle time
+        var maxIdle = cluster.getMaxIdle();
+        
+        // a new worker builder for new instance
+        var workerBuilder = ClusterWorker.builder()
+                .name(input.getName())
+                .kind(input.getKind())
+                .cluster(cluster.getCluster())
+                .session(Str.random(16))
+                .persistence(input.isPersistence())
+                .persistenceMethod(input.getPersistenceMethod())
+                .maxIdle(maxIdle)
+                .updated(now);
+        
+        // the list of workers 
+        List<ClusterWorker> workers = Lang.or(cluster.getWorkers(), () -> Arrays.asList());
+        
+        // get all other worker entities (having other names)
+        var newWorkers = workers.stream().filter(w -> !w.getName().equals(input.getName())).collect(Collectors.toList());
+        
+        // new cluster builder to update
+        var updatedCluster = cluster.toBuilder()
+                .workers(newWorkers)
+                .updated(now)
+                .build();
+        
+        // get worker with given name if any
+        var existing = workers.stream().filter(w -> w.getName().equals(input.getName())).findFirst();
+        
+        // if input worker wants to be an exclusive worker in cluster
+        if(input.getKind() == WorkerKind.EXCLUSIVE){
+            
+            // check if any active worker is there
+            var anyActive = workers.stream().anyMatch(w -> !this.isIdle(w, now, maxIdle));
+            
+            // there is an active one so cannot add exclusive one
+            if(anyActive){
+                throw new SchedulerDataException("Worker Error", Arrays.asList("Cannot join exclusive worker as there is already an active worker."));
+            }
+            
+            // finalize exclusive worker
+            var finalWorker = workerBuilder.build();
+            
+            // add exclusive worker to final workers list
+            newWorkers.add(finalWorker);
+            
+            // save updated cluster
+            this.updateCluster(session, updatedCluster);
+            
+            return finalWorker;
+        }
+        
+        // indicate if there is any active exclusive item
+        var anyActiveExclusive = workers.stream().anyMatch(w -> !this.isIdle(w, now, maxIdle) && w.getKind() == WorkerKind.EXCLUSIVE);
+        
+        // in case if cluster has exclusive active worker we cannot add more
+        if(anyActiveExclusive){
+            throw new SchedulerDataException("Worker Error", Arrays.asList("Cannot join any worker as there is an exclusive active worker"));
+        }
+        
+        // if input is a balanced worker then we will add with unique name
+        if(input.getKind() == WorkerKind.BALANCED){
+            
+            // add a random postfix for the new balanced worker name
+            workerBuilder.name(String.format("%s-%s", input.getName(), Str.random(8)));
+            
+            // finalize balanced worker
+            var finalWorker = workerBuilder.build();
+            
+            // add balanced worker to final workers list
+            newWorkers.add(finalWorker);
+            
+            // save updated cluster
+            this.updateCluster(session, updatedCluster);
+            
+            return finalWorker;
+        }
+        
+        // if joining worker is of kind replica 
+        if(input.getKind() == WorkerKind.REPLICA){
+            
+            // if there is an existing non-idle (active) worker with same name do not replicate
+            if(existing.isPresent() && !this.isIdle(existing.get(), now, maxIdle)){
+                throw new SchedulerDataException("Worker Error", Arrays.asList("An active worker with same name already exists"));
+            }
+            
+            // finalize replica worker
+            var finalWorker = workerBuilder.build();
+            
+            // add replica worker to final workers list
+            newWorkers.add(finalWorker);
+            
+            // save updated cluster
+            this.updateCluster(session, updatedCluster);
+            
+            return finalWorker;
+        }      
+        
+        // no supported otherwise
+        throw new SchedulerDataException("Worker Error", Arrays.asList("The worker kind is not supported"));
+    }
+    
+    /**
+     * Checks if the worker is idle as of now
+     * 
+     * @param worker The worker to check
+     * @param now The now time to consider
+     * @param maxIdle The maximum idle time in cluster
+     * @return Returns if idle
+     */
+    protected boolean isIdle(ClusterWorker worker, Date now, long maxIdle){
+        
+        // updated instant
+        var updated = worker.getUpdated().toInstant().toEpochMilli();
+        
+        // current instant
+        var current = now.toInstant().toEpochMilli();
+        
+        // if updated time considering maximum idle time is before current time consider as idle
+        return updated + maxIdle < current;
+    }
+
+    /**
+     * Updates existing cluster definition in the storage
+     * 
+     * @param session The client session
+     * @param cluster The updated cluster
+     * @return Returns the updated cluster
+     */
+    protected ClusterDefinition updateCluster(ClientSession session, ClusterDefinition cluster) {
+
+        // perform replace operation and get result
+        this.clusters.replaceOne(session, this.hasId(cluster.getId()), cluster);
+        
+        // try get updated item
+        var updated = this.clusters.find(session, this.hasId(cluster.getId())).first();
+    
+        // updated entity does not exist
+        if(updated == null){
+            throw new SchedulerDataException("Cluster Update Failed", Arrays.asList("The cluster is not updated due to internal error"));
+        }
+        
+        return updated;
     }
 }

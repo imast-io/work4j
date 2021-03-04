@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder(toBuilder = true)
-public class ClusterJoinInput implements Serializable {
+public class WorkerJoinInput implements Serializable {
     
     /**
      * The cluster reference
@@ -25,7 +25,7 @@ public class ClusterJoinInput implements Serializable {
     /**
      * The worker name to join
      */
-    private String worker;
+    private String name;
     
     /**
      * The session of worker

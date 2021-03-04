@@ -10,6 +10,11 @@ import java.io.Serializable;
 public enum WorkerKind implements Serializable {
     
     /**
+     * The exclusive worker (only one) for this cluster
+     */
+    EXCLUSIVE,
+    
+    /**
      * The standalone replica worker kind 
      */
     REPLICA,

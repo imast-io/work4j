@@ -24,6 +24,11 @@ public class ClusterWorker implements Serializable {
     private String name;
     
     /**
+     * The cluster identity
+     */
+    private String cluster;
+    
+    /**
      * The worker kind within cluster
      */
     private WorkerKind kind;
@@ -42,6 +47,11 @@ public class ClusterWorker implements Serializable {
      * The persistence method value for reference only
      */
     private String persistenceMethod;
+    
+    /**
+     * The maximum idle time
+     */
+    private long maxIdle;
     
     /**
      * The last check-in activity

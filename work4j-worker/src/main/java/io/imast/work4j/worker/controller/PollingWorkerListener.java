@@ -7,9 +7,9 @@ import io.imast.work4j.channel.worker.WorkerExecutionPaused;
 import io.imast.work4j.channel.worker.WorkerExecutionResumed;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.channel.worker.WorkerMessage;
+import io.imast.work4j.model.cluster.ClusterWorker;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionStatus;
-import io.imast.work4j.model.cluster.Worker;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.instance.QuartzInstance;
@@ -36,7 +36,7 @@ public class PollingWorkerListener implements WorkerListener {
     /**
      * The worker instance
      */
-    protected final Worker worker;
+    protected final ClusterWorker worker;
 
     /**
      * The quartz instance
@@ -76,7 +76,7 @@ public class PollingWorkerListener implements WorkerListener {
      * @param channel The polling channel
      * @param config The worker configuration
      */
-    public PollingWorkerListener(Worker worker, QuartzInstance instance, SchedulerChannel channel, WorkerConfiguration config){
+    public PollingWorkerListener(ClusterWorker worker, QuartzInstance instance, SchedulerChannel channel, WorkerConfiguration config){
         this.worker = worker;
         this.instance = instance;
         this.channel = channel;
@@ -150,7 +150,7 @@ public class PollingWorkerListener implements WorkerListener {
     protected void syncImpl() throws WorkerException{
         
         // get metadata for cluster
-        this.channel.executionIndex(this.worker.getTenant(), this.worker.getCluster()).subscribe(
+        this.channel.executionIndex(this.worker.getCluster()).subscribe(
                 this::syncIndex, 
                 err -> log.error("PollingListener: Could not pull execution index.", err));
     }

@@ -1,13 +1,12 @@
 package io.imast.work4j.channel;
 
+import io.imast.work4j.model.cluster.ClusterWorker;
 import io.imast.work4j.model.iterate.*;
 import io.imast.work4j.model.execution.CompletionSeverity;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
-import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
-import io.imast.work4j.model.cluster.Worker;
 import io.imast.work4j.model.cluster.WorkerHeartbeat;
-import io.imast.work4j.model.cluster.WorkerInput;
+import io.imast.work4j.model.cluster.WorkerJoinInput;
 import java.util.List;
 import reactor.core.publisher.Mono;
 
@@ -21,11 +20,10 @@ public interface SchedulerChannel {
     /**
      * Pull job groups for the given cluster
      * 
-     * @param tenant The target tenant
      * @param cluster The target cluster
      * @return Returns execution index entries
      */
-    public Mono<List<ExecutionIndexEntry>> executionIndex(String tenant, String cluster);
+    public Mono<List<ExecutionIndexEntry>> executionIndex(String cluster);
     
     /**
      * Exchange current status with modified entries
@@ -58,14 +56,13 @@ public interface SchedulerChannel {
      * @param input The worker input to register
      * @return Returns registered worker
      */
-    public Mono<Worker> registration(WorkerInput input);
+    public Mono<ClusterWorker> registration(WorkerJoinInput input);
     
     /**
      * Send a Heartbeat signal to from worker scheduler
      * 
-     * @param id The identifier of worker instance
      * @param heartbeat The worker reported heartbeat
      * @return Returns updated agent definition
      */
-    public Mono<Worker> heartbeat(String id, WorkerHeartbeat heartbeat);
+    public Mono<ClusterWorker> heartbeat(WorkerHeartbeat heartbeat);
 }

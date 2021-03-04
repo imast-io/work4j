@@ -7,7 +7,7 @@ import io.imast.work4j.channel.worker.WorkerExecutionPaused;
 import io.imast.work4j.channel.worker.WorkerExecutionResumed;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.channel.worker.WorkerMessage;
-import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.ClusterWorker;
 import io.imast.work4j.model.cluster.WorkerActivity;
 import io.imast.work4j.model.cluster.WorkerHeartbeat;
 import io.imast.work4j.worker.WorkerConfiguration;
@@ -54,7 +54,7 @@ public class WorkerController {
     /**
      * The registered worker instance 
      */
-    protected final Worker worker;
+    protected final ClusterWorker worker;
     
     /**
      * Creates new controller based on quartz instance and communication channel
@@ -65,7 +65,7 @@ public class WorkerController {
      * @param listeners The worker listeners
      * @param config The worker configuration
      */
-    public WorkerController(Worker worker, QuartzInstance instance, SchedulerChannel channel, List<WorkerListener> listeners, WorkerConfiguration config){
+    public WorkerController(ClusterWorker worker, QuartzInstance instance, SchedulerChannel channel, List<WorkerListener> listeners, WorkerConfiguration config){
         this.worker = worker;
         this.instance = instance;
         this.channel = channel;
@@ -173,8 +173,16 @@ public class WorkerController {
      * Report the health to scheduler
      */
     protected void heartbeat() {
-                
+        
+        // the heartbeat info
+        var heartbeat = WorkerHeartbeat
+                .builder()
+                .name(this.worker.getName())
+                .cluster(this.worker.getCluster())
+                .activity(WorkerActivity.HEARTBEAT)
+                .build();
+        
         // report new health info
-        this.channel.heartbeat(this.worker.getId(), WorkerHeartbeat.builder().activity(WorkerActivity.HEARTBEAT).build()).subscribe();
+        this.channel.heartbeat(heartbeat).subscribe();
     }
 }
