@@ -38,12 +38,7 @@ public class JobDefinitionInput implements Serializable {
      * The set of trigger definitions
      */
     private List<TriggerDefinition> triggers;
-       
-    /**
-     * The job definition tenant
-     */
-    private String tenant;
-    
+  
     /**
      * The cluster for the job
      */

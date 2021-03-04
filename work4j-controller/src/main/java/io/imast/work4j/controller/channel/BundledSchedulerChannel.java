@@ -2,17 +2,16 @@ package io.imast.work4j.controller.channel;
 
 import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.controller.SchedulerController;
+import io.imast.work4j.model.cluster.ClusterWorker;
+import io.imast.work4j.model.cluster.WorkerHeartbeat;
+import io.imast.work4j.model.cluster.WorkerJoinInput;
 import io.imast.work4j.model.execution.CompletionSeverity;
 import io.imast.work4j.model.execution.ExecutionIndexEntry;
 import io.imast.work4j.model.execution.ExecutionUpdateInput;
 import io.imast.work4j.model.execution.ExecutionStatus;
-import io.imast.work4j.model.execution.ExecutionsResponse;
 import io.imast.work4j.model.execution.JobExecution;
 import io.imast.work4j.model.iterate.Iteration;
 import io.imast.work4j.model.iterate.IterationInput;
-import io.imast.work4j.model.cluster.Worker;
-import io.imast.work4j.model.cluster.WorkerHeartbeat;
-import io.imast.work4j.model.cluster.WorkerInput;
 import io.vavr.control.Try;
 import java.util.List;
 import reactor.core.publisher.Mono;
@@ -41,14 +40,13 @@ public class BundledSchedulerChannel implements SchedulerChannel {
     /**
      * Pull job groups for the given cluster
      * 
-     * @param tenant The target tenant
      * @param cluster The target cluster
      * @return Returns execution index entries
      */
     @Override
-    public Mono<List<ExecutionIndexEntry>> executionIndex(String tenant, String cluster) {
+    public Mono<List<ExecutionIndexEntry>> executionIndex(String cluster) {
         // try get executions
-        var executions = Try.of(() -> this.controller.getExecutionIndex(tenant, cluster));
+        var executions = Try.of(() -> this.controller.getExecutionIndex(cluster));
         
         // in case of success build and return response
         if(executions.isSuccess()){
@@ -125,9 +123,9 @@ public class BundledSchedulerChannel implements SchedulerChannel {
      * @return Returns registered worker
      */
     @Override
-    public Mono<Worker> registration(WorkerInput input){
+    public Mono<ClusterWorker> registration(WorkerJoinInput input){
         // do create worker
-        var created = Try.of(() -> this.controller.insertWorker(input));
+        var created = Try.of(() -> this.controller.joinWorker(input));
         
         // in case of success build and return response
         if(created.isSuccess()){
@@ -140,14 +138,13 @@ public class BundledSchedulerChannel implements SchedulerChannel {
     /**
      * Send a Heartbeat signal to from worker scheduler
      * 
-     * @param id The identifier of worker instance
      * @param heartbeat The worker reported heartbeat
      * @return Returns updated agent definition
      */
     @Override
-    public Mono<Worker> heartbeat(String id, WorkerHeartbeat heartbeat){
+    public Mono<ClusterWorker> heartbeat(WorkerHeartbeat heartbeat){
         // do update the worker
-        var updated = Try.of(() -> this.controller.updateWorker(id, heartbeat));
+        var updated = Try.of(() -> this.controller.updateWorker(heartbeat));
         
         // in case of success build and return response
         if(updated.isSuccess()){

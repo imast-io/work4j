@@ -6,18 +6,28 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * The worker heartbeat info
+ * The worker heartbeat definition
  * 
  * @author davitp
  */
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
+@AllArgsConstructor
 @Builder(toBuilder = true)
 public class WorkerHeartbeat {
     
     /**
-     * The last activity in the session
+     * The cluster name
+     */
+    private String cluster;
+    
+    /**
+     * The worker name
+     */
+    private String name;
+    
+    /**
+     * The worker latest activity
      */
     private WorkerActivity activity;
 }

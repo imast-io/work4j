@@ -6,9 +6,11 @@ import io.imast.work4j.channel.SchedulerChannel;
 import io.imast.work4j.channel.worker.WorkerListener;
 import io.imast.work4j.execution.JobExecutor;
 import io.imast.work4j.execution.JobExecutorContext;
-import io.imast.work4j.model.cluster.Worker;
+import io.imast.work4j.model.cluster.ClusterWorker;
+import io.imast.work4j.model.cluster.WorkerKind;
 import io.imast.work4j.worker.ClusteringType;
 import io.imast.work4j.worker.JobConstants;
+import io.imast.work4j.worker.PersistenceType;
 import io.imast.work4j.worker.WorkerConfiguration;
 import io.imast.work4j.worker.WorkerException;
 import io.imast.work4j.worker.WorkerFactory;
@@ -73,7 +75,7 @@ public class WorkerControllerBuilder {
     /**
      * The worker instance
      */
-    private Worker worker;
+    private ClusterWorker worker;
     
     /**
      * The scheduler channel
@@ -122,7 +124,7 @@ public class WorkerControllerBuilder {
      * @param worker The worker instance
      * @return Returns builder for chaining
      */
-    public WorkerControllerBuilder withWorker(Worker worker){
+    public WorkerControllerBuilder withWorker(ClusterWorker worker){
         this.worker = worker;
         return this;
     }
@@ -173,22 +175,35 @@ public class WorkerControllerBuilder {
         // props
         var props = new Properties();
         
+        // the worker is balanced
+        var clustered = this.worker.getKind() == WorkerKind.BALANCED;
+        
+        // use worker name as instance name for scheduler
+        var instanceName = clustered ? this.worker.getCluster() : this.worker.getName();
+        
+        // use worker name as id, it's unique in case of clustered mode
+        var instanceId = this.worker.getName();
+        
         // set instance name for quartz scheduler
-        props.setProperty("org.quartz.scheduler.instanceName", "WORK4J_" + this.worker.getCluster());
-        props.setProperty("org.quartz.scheduler.instanceId", "WORK4J_" + this.worker.getName());
+        props.setProperty("org.quartz.scheduler.instanceName", "WORK4J_" + instanceName);
+        props.setProperty("org.quartz.scheduler.instanceId", "WORK4J_" + instanceId);
         props.setProperty("org.quartz.threadPool.threadCount", this.config.getParallelism().toString());
         
         // other props
         props.setProperty("org.quartz.scheduler.skipUpdateCheck", "true");
         props.setProperty("org.quartz.scheduler.jobFactory.class", "org.quartz.simpl.SimpleJobFactory");
 
-        // if JDBC clustering
-        if(this.config.getClusteringType() == ClusteringType.JDBC){
-            props.setProperty("org.quartz.jobStore.class", "org.quartz.impl.jdbcjobstore.JobStoreTX");
-            props.setProperty("org.quartz.jobStore.driverDelegateClass", "org.quartz.impl.jdbcjobstore.StdJDBCDelegate");
-            props.setProperty("org.quartz.jobStore.dataSource", this.config.getDataSource());
-            props.setProperty("org.quartz.jobStore.tablePrefix", "QRTZ_");
-
+        // mark as clustered if needed
+        if(clustered){
+            props.setProperty("org.quartz.jobStore.isClustered", "true");
+            props.setProperty("org.quartz.scheduler.clusterCheckinInterval ", Long.toString(this.worker.getMaxIdle()));
+        }
+        
+        // persistance enabled
+        var persist = this.config.getPersistenceType() != PersistenceType.NO;
+        
+        // should set persistance-related attributes
+        if(persist){
             // prefix for data store property
             var dsPropPrefix = String.format("org.quartz.dataSource.%s", this.config.getDataSource());
             
@@ -198,6 +213,16 @@ public class WorkerControllerBuilder {
             props.setProperty(String.format("%s.%s", dsPropPrefix, "user"), this.config.getDataSourceUsername());
             props.setProperty(String.format("%s.%s", dsPropPrefix, "password"), this.config.getDataSourcePassword());
             props.setProperty(String.format("%s.%s", dsPropPrefix, "maxConnections"), "30");
+            
+            // set store's data source
+            props.setProperty("org.quartz.jobStore.dataSource", this.config.getDataSource());
+        }
+        
+        // if JDBC clustering
+        if(this.config.getClusteringType() == ClusteringType.JDBC){
+            props.setProperty("org.quartz.jobStore.tablePrefix", "QRTZ_");
+            props.setProperty("org.quartz.jobStore.class", "org.quartz.impl.jdbcjobstore.JobStoreTX");
+            props.setProperty("org.quartz.jobStore.driverDelegateClass", "org.quartz.impl.jdbcjobstore.StdJDBCDelegate");            
         }
         
         return props;

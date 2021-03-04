@@ -52,6 +52,11 @@ public class WorkerConfiguration {
     private Integer workerRegistrationTries;
     
     /**
+     * The type of persistence
+     */
+    private PersistenceType persistenceType;
+    
+    /**
      * The type of clustering
      */
     private ClusteringType clusteringType;

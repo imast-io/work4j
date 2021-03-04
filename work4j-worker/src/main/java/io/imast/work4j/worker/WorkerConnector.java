@@ -3,8 +3,9 @@ package io.imast.work4j.worker;
 import io.imast.core.Lang;
 import io.imast.core.Str;
 import io.imast.work4j.channel.SchedulerChannel;
-import io.imast.work4j.model.cluster.Worker;
-import io.imast.work4j.model.cluster.WorkerInput;
+import io.imast.work4j.model.cluster.ClusterWorker;
+import io.imast.work4j.model.cluster.WorkerJoinInput;
+import io.imast.work4j.model.cluster.WorkerKind;
 import io.vavr.control.Try;
 import lombok.extern.slf4j.Slf4j;
 
@@ -20,42 +21,54 @@ public class WorkerConnector {
      * The scheduler channel
      */
     protected final SchedulerChannel channel;
+
+    /**
+     * The configuration
+     */
+    protected final WorkerConfiguration config;
    
     /**
      * Creates new instance of worker connector
      * 
-     * @param channel 
+     * @param config The configuration
+     * @param channel The scheduler channel
      */
-    public WorkerConnector(SchedulerChannel channel){
-       this.channel = channel; 
+    public WorkerConnector(WorkerConfiguration config, SchedulerChannel channel){
+        this.config = config;
+        this.channel = channel; 
     }
     
     /**
      * Connects to the scheduler based on the channel and gets instance of worker
      * 
-     * @param config The configuration of worker
      * @return Returns worker instance
      * @throws WorkerException 
      */
-    public Worker connect(WorkerConfiguration config) throws WorkerException{
+    public ClusterWorker connect() throws WorkerException {
         
         // get the given name
-        var name = config.getName();
+        var name = this.config.getName();
         
         // if name is not given use a random name
         if(Str.blank(name)){
-            name = Str.random(8);
+            name = String.format("WRK-%s", Str.random(6));
         }
         
         // get the cluster name (use default if not given from configuration)
-        var cluster = Str.blank(config.getCluster()) ? JobConstants.DEFAULT_CLUSTER : config.getCluster();
+        var cluster = Str.blank(this.config.getCluster()) ? JobConstants.DEFAULT_CLUSTER : this.config.getCluster();
+        
+        // the persistence type
+        var persistence = this.config.getPersistenceType() == null ? PersistenceType.NO : this.config.getPersistenceType();
         
         // build the worker input
-        var input = WorkerInput.builder()
+        var input = WorkerJoinInput.builder()
                 .name(name)
                 .cluster(cluster)
-                .tenant(config.getTenant())
-                .maxIdle(config.getHeartbeatRate())
+                .session(String.format("%s-%s-%s-%s", Str.random(4), Str.random(4), Str.random(4), Str.random(4)))
+                .persistence(persistence != PersistenceType.NO)
+                .persistenceMethod(persistence.name())
+                .kind(this.mapKind(this.config.getClusteringType()))
+                .maxIdle(this.config.getHeartbeatRate())
                 .build();
         
         // number of tries
@@ -91,5 +104,26 @@ public class WorkerConnector {
         }
         
         throw new WorkerException("Could not connect to register the worker", lastException);
+    }
+    
+    /**
+     * Map clustering type to worker kind
+     * 
+     * @param type The clustering type
+     * @return Returns the worker kind
+     */
+    protected WorkerKind mapKind(ClusteringType type) throws WorkerException {
+        
+        // map clustering type to worker kind
+        switch(type){
+            case EXCLUSIVE:
+                return WorkerKind.EXCLUSIVE;
+            case REPLICA:
+                return WorkerKind.REPLICA;
+            case BALANCED:
+                return WorkerKind.BALANCED;
+        }
+        
+        throw new WorkerException("No Clustering Type is not supported");
     }
 }
