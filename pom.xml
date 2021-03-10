@@ -10,7 +10,7 @@
     
     <description>Work4j: service-oriented, scalable, and high-availability scheduling subsystem</description>    
 	
-    <url>https://github.com/imast-io/work4j</url>
+    <url>https://github.com/imastio/work4j</url>
 	
     <licenses>
         <license>
@@ -154,6 +154,6 @@
     </distributionManagement>
     
     <scm>
-        <url>https://github.com/imast-io/imast-core/tree/main</url>
+        <url>https://github.com/imastio/work4j/tree/main</url>
     </scm>
 </project>
