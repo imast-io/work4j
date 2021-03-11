@@ -1,0 +1,66 @@
+version: '3.5'
+
+volumes: 
+  imast-mysql-volume: 
+    name: imast-mysql-volume
+  imast-mongo-data-volume:
+    name: imast-mongo-data-volume
+  imast-mongo-logs-volume:
+    name: imast-mongo-logs-volume
+
+
+networks:
+  imastnetwork:
+    name: imastnetwork
+
+services:  
+
+  mysqlcluster:
+    image: work4j/samples/mysqlcluster
+    restart: always
+    build: ./mysqlcluster
+    container_name: work4j_sample_mysqlcluster
+    env_file: ./mysqlcluster/cred.env
+    ports:
+      - '8810:8810'
+    networks:
+      - imastnetwork
+    volumes:
+      - imast-mysql-volume:/var/lib/mysql
+      
+  mongoctl:
+    image: work4j/samples/mongoctl
+    restart: always
+    build: ./mongoctl
+    container_name: work4j_sample_mongoctl
+    env_file: ./mongoctl/cred.env
+    ports:
+      - '8809:8809'
+    networks:
+      - imastnetwork
+    volumes:
+      - imast-mongo-data-volume:/data/db
+      - imast-mongo-logs-volume:/data/logs
+
+  scheduler:
+    image: work4j/samples/scheduler  
+    build: ./scheduler
+    container_name: work4j_sample_scheduler
+    ports:
+      - '8801:8801'
+    networks:
+      - imastnetwork
+    depends_on:
+      - mongoctl
+      
+  worker:
+    image: work4j/samples/worker  
+    build: ./worker
+    container_name: work4j_sample_worker
+    networks:
+      - imastnetwork
+    depends_on:
+      - mysqlcluster
+            
+
+
