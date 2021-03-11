@@ -1,6 +1,8 @@
 # Work4j
 Work4j is an open-source library to create distributed, highly available job scheduler.
 
+[![javadoc](https://javadoc.io/badge2/io.imast/work4j-controller/controller.svg)](https://javadoc.io/doc/io.imast/work4j-controller) [![javadoc](https://javadoc.io/badge2/io.imast/work4j-worker/worker.svg)](https://javadoc.io/doc/io.imast/work4j-worker) 
+
 ## Using Work4j with Maven
 
 ### Building a Scheduler Applicatin
