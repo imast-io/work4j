@@ -5,7 +5,6 @@ Work4j is an open-source library to create distributed, highly available job sch
 
 ### Building a Scheduler Applicatin
 ```xml
-```xml
 <dependency>
   <groupId>io.imast</groupId>
   <artifactId>work4j-controller</artifactId>
